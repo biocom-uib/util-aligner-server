@@ -28,3 +28,7 @@ CELERY_TASK_DEFAULT_QUEUE = 'server_default'
 CELERY_TASK_DEFAULT_ROUTING_KEY = CELERY_TASK_DEFAULT_QUEUE
 CELERY_TASK_DEFAULT_EXCHANGE = 'celery'
 CELERY_TASK_DEFAULT_EXCHANGE_TYPE = 'direct'
+
+
+FINISHED_JOB_URL = env('FINISHED_JOB_URL',
+                       'http://api:8080/util-aligner/finished-job')
