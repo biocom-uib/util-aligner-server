@@ -1,0 +1,4 @@
+celery==4.1.0
+aiohttp==3.0.6
+aiomysql==0.0.9
+environs==2.1.0
