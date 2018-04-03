@@ -19,6 +19,9 @@ def insert_result_sync(results):
 def process_alignment(data):
     logger.info(data)
     logger.info(data['db'])
+    alignment = [{data['net1']: f'node_{i}', data['net2']: f'node_{i}'}
+                 for i in range(100)]
+    data['alignment'] = alignment
     results = {'results': data}
     result_id = insert_result_sync(results)
     send_finished_job(data['job_id'], result_id)
