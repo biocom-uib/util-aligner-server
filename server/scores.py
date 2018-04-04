@@ -59,6 +59,7 @@ def compute_ec(net1, net2, alignment):
         'unknown_nodes_net1': list(unknown_nodes_net1),
         'unknown_nodes_net2': list(unknown_nodes_net2),
         'num_preserved_edges': num_preserved_edges,
+        'broken_edges': list(broken_edges),
         'ec_score': num_preserved_edges / min_es,
     }
 
