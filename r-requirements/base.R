@@ -1,8 +1,4 @@
-repo = getOption("repos")
-# set up the server from which you will download the package.
-repo["CRAN"] = "http://cran.case.edu"
-options(repos = repo)
-rm(repo)
+options(repos = 'http://cran.rstudio.com/')
 
 install.packages('devtools', verbose=TRUE)
 install.packages('igraph', verbose=TRUE)
