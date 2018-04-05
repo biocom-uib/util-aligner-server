@@ -5,7 +5,6 @@ import json
 from lazy_property import LazyProperty
 import numpy as np
 # import psycopg2
-import os
 from os import path
 
 import util

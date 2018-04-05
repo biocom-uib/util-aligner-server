@@ -1,6 +1,3 @@
-import itertools
-
-
 def compute_ec(net1, net2, alignment):
     net1 = net1.igraph
     net2 = net2.igraph
