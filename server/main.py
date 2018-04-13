@@ -30,6 +30,7 @@ def process_alignment(data):
     net1_name = data['net1']
     net2_name = data['net2']
     aligner_name = data['aligner'].lower()
+    aligner_params = data.get('aligner_params', dict())
 
     if db_name == 'isobase':
         db = IsobaseLocal('/opt/networks/isobase')
@@ -57,7 +58,7 @@ def process_alignment(data):
     if aligner_name not in aligners_dispatcher:
         raise ValueError(f'aligner not supported: {aligner_name}')
 
-    aligner = aligners_dispatcher[aligner_name]()
+    aligner = aligners_dispatcher[aligner_name](**aligner_params)
 
     results = aligner.run(
         *run_args,
@@ -69,6 +70,7 @@ def process_alignment(data):
         'net1': net1_name,
         'net2': net2_name,
         'aligner': aligner_name,
+        'aligner_params': aligner_params,
         'results': results,
         'timestamp': time.time(),
     }
