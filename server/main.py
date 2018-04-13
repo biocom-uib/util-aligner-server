@@ -9,8 +9,8 @@ from server_queue import app
 import time
 
 import aligners
-import scores
-import sources
+from scores import compute_scores
+from sources import IsobaseLocal
 
 logger = logging.getLogger(__name__)
 
@@ -32,31 +32,32 @@ def process_alignment(data):
     aligner_name = data['aligner'].lower()
 
     if db_name == 'isobase':
-        db = sources.IsobaseLocal('/opt/networks/isobase')
+        db = IsobaseLocal('/opt/networks/isobase')
         net1 = db.get_network(net1_name)
         net2 = db.get_network(net2_name)
-        net1_net2_scores = db.get_score_matrix(net1_name, net2_name, net1=net1, net2=net2)
+        net1_net2_scores = db.get_bitscore_matrix(net1_name, net2_name, net1=net1, net2=net2)
 
         if aligner_name == 'alignet':
-            net1_scores = db.get_score_matrix(net1_name)
-            net2_scores = db.get_score_matrix(net2_name)
+            net1_scores = db.get_bitscore_matrix(net1_name)
+            net2_scores = db.get_bitscore_matrix(net2_name)
             run_args = (net1, net2, net1_scores, net2_scores, net1_net2_scores)
-            aligner = aligners.Alignet()
         else:
             run_args = (net1, net2, net1_net2_scores)
-
-            if aligner_name == 'hubalign':
-                aligner = aligners.Hubalign()
-            elif aligner_name == 'lgraal':
-                aligner = aligners.LGraal()
-            elif aligner_name == 'pinalog':
-                aligner = aligners.Pinalog()
-            elif aligner_name == 'spinal':
-                aligner = aligners.Spinal()
-            else:
-                raise ValueError(f'aligner not supported: {aligner_name}')
     else:
         raise ValueError(f'database not supported: {db_name}')
+
+    aligners_dispatcher = {
+        'alignet':  aligners.Alignet,
+        'hubalign': aligners.Hubalign,
+        'l-graal':  aligners.LGraal,
+        'pinalog':  aligners.Pinalog,
+        'spinal':   aligners.Spinal,
+    }
+
+    if aligner_name not in aligners_dispatcher:
+        raise ValueError(f'aligner not supported: {aligner_name}')
+
+    aligner = aligners_dispatcher[aligner_name]()
 
     results = aligner.run(
         *run_args,
@@ -73,7 +74,7 @@ def process_alignment(data):
     }
 
     if results['ok']:
-        response_data['scores'] = scores.compute_scores(net1, net2, results, db.get_ontology_mapping([net1,net2]))
+        response_data['scores'] = compute_scores(net1, net2, results, db.get_ontology_mapping([net1,net2]))
 
     result_id = insert_result_sync(response_data)
 

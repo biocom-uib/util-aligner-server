@@ -10,7 +10,6 @@ import tempfile
 import time
 
 import util
-import sources
 
 
 class Aligner(object):
@@ -28,7 +27,7 @@ class Aligner(object):
     def write_files(self, run_dir_path):
         pass
 
-    def import_alignment(self, execution_dir, file_name):
+    def import_alignment(self, net1, net2, execution_dir, file_name=None):
         pass
 
     def _gen_run_dir(run_dir_base_path, max_trials):
@@ -56,14 +55,14 @@ class Aligner(object):
 
         self.write_files(run_dir_path, *args)
 
-    def run(self, *args, run_dir_base_path='run', template_dir_base_path='template', max_trials=50):
+    def run(self, net1, net2, *args, run_dir_base_path='run', template_dir_base_path='template', max_trials=50):
         os.makedirs(run_dir_base_path, exist_ok=True)
 
         with tempfile.TemporaryDirectory(dir=run_dir_base_path, prefix=self.name + '-') as run_dir_path:
             self.logger.info(f'run_{self.name} @ {run_dir_path}: setting up required files')
 
             try:
-                self._setup_run_dir(run_dir_path, template_dir_base_path, *args)
+                self._setup_run_dir(run_dir_path, template_dir_base_path, net1, net2, *args)
             except Exception as ex:
                 self.logger.exception(f'run_{self.name} @ {run_dir_path}: an exception was raised while setting up the run directory')
                 return {'ok': False}
@@ -104,7 +103,7 @@ class Aligner(object):
                 result['exit_code'] = completed_process.returncode
 
                 result['run_time'] = end_time - start_time
-                result['alignment'] = self.import_alignment(run_dir_path)
+                result['alignment_header'], result['alignment'] = self.import_alignment(net1, net2, run_dir_path)
 
             return result
 
@@ -162,11 +161,15 @@ class Hubalign(Aligner):
         elif alpha < 1:
             raise ValueError('must provide a BLAST matrix whenever alpha < 1')
 
-    def import_alignment(self, execution_dir, file_name='net1.tab-net2.tab.alignment'):
-        align_path = path.join(execution_dir, file_name)
+    def import_alignment(self, net1, net2, execution_dir, file_name='net1.tab-net2.tab.alignment'):
+        if net1.igraph.vcount() < net2.igraph.vcount():
+            header = (net1.name, net2.name)
+        else:
+            header = (net2.name, net1.name)
 
-        return [(a,b) for a, b in util.iter_csv(align_path, delimiter=' ', skipinitialspace=False)
-                      if a != '' and b != '']
+        align_path = path.join(execution_dir, file_name)
+        return header, [(a,b) for a, b in util.iter_csv(align_path, delimiter=' ', skipinitialspace=False)
+                              if a != '' and b != '']
 
 class Alignet(Aligner):
     def __init__(self, threads=1):
@@ -211,9 +214,10 @@ class Alignet(Aligner):
         blast_net1_net2_path = path.join(run_dir_path, 'blast-net1-net2.tab')
         blast_net1_net2.write_tricol(blast_net1_net2_path)
 
-    def import_alignment(self, execution_dir, file_name='alignment-net1-net2.tab'):
+    def import_alignment(self, net1, net2, execution_dir, file_name='alignment-net1-net2.tab'):
+        header = (net1.name, net2.name)
         align_path = path.join(execution_dir, file_name)
-        return [(a.strip(), b.strip()) for a, b in util.iter_csv(align_path, delimiter='\t')]
+        return header, [(a.strip(), b.strip()) for a, b in util.iter_csv(align_path, delimiter='\t')]
 
 class LGraal(Aligner):
     def __init__(self, alpha=0.5, nthreshold=0.5, iterlimit=1000, timelimit=3600):
@@ -290,10 +294,11 @@ class LGraal(Aligner):
         ncount4_net2_path = path.join(run_dir_path, 'ncount4-net2', 'net2')
         self._run_ncount4(run_dir_path, net2_path, ncount4_net2_path)
 
-    def import_alignment(self, execution_dir, file_name='alignment-net1-net2.tab'):
+    def import_alignment(self, net1, net2, execution_dir, file_name='alignment-net1-net2.tab'):
+        header = (net1.name, net2.name)
         align_path = path.join(execution_dir, file_name)
-        return [(a.strip(), b.strip()) for a, b in util.iter_csv(align_path, delimiter='\t')
-                                       if not (a.strip() == '' and b.strip() == '') ]
+        return header, [(a.strip(), b.strip()) for a, b in util.iter_csv(align_path, delimiter='\t')
+                                               if a.strip() != '' and b.strip() != '']
 
 class Pinalog(Aligner):
     def __init__(self):
@@ -322,9 +327,10 @@ class Pinalog(Aligner):
         blast_path = path.join(run_dir_path, 'blast-net1-net2.tab')
         blast_net1_net2.write_tricol(blast_path)
 
-    def import_alignment(self, execution_dir, file_name='net1_net2.pinalog.nodes_algn.txt'):
+    def import_alignment(self, net1, net2, execution_dir, file_name='net1_net2.pinalog.nodes_algn.txt'):
+        header = (net1.name, net2.name)
         align_path = path.join(execution_dir, file_name)
-        return [(a, b) for a, b, some_score in util.iter_csv(align_path, delimiter='\t')]
+        return header, [(a, b) for a, b, some_score in util.iter_csv(align_path, delimiter='\t')]
 
 class Spinal(Aligner):
     def __init__(self, alpha=0.7):
@@ -359,9 +365,9 @@ class Spinal(Aligner):
         blast_path = path.join(run_dir_path, 'blast-net1-net2.csv')
         blast_net1_net2.write_tricol(blast_path, by='index', delimiter=' ')
 
-    def import_alignment_names(self, execution_dir, file_name='alignment-net1-net2-names.tab'):
-        align_path = path.join(execution_dir, file_name)
-        return [(a, b) for a, b in iter_csv(align_path, delimiter='\t')]
+    # def import_alignment_names(self, execution_dir, file_name='alignment-net1-net2-names.tab'):
+    #     align_path = path.join(execution_dir, file_name)
+    #     return [(a, b) for a, b in iter_csv(align_path, delimiter='\t')]
 
     def iter_alignment_ids(self, execution_dir, file_name='alignment-net1-net2.csv'):
         alignment_path = path.join(execution_dir, file_name)
@@ -373,17 +379,19 @@ class Spinal(Aligner):
         for p1id, p2id in csv_rows:
             yield int(p1id), int(p2id)
 
-    def iter_alignment(self, execution_dir, file_name='alignment-net1-net2.csv'):
-        net1_vs = sources.read_net_gml(path.join(execution_dir, 'net1.gml')).igraph.vs
-        net2_vs = sources.read_net_gml(path.join(execution_dir, 'net2.gml')).igraph.vs
+    def iter_alignment(self, net1, net2, execution_dir, file_name='alignment-net1-net2.csv'):
+        net1_vs = net1.igraph.vs # sources.read_net_gml(net1.name, path.join(execution_dir, 'net1.gml')).igraph.vs
+        net2_vs = net2.igraph.vs # sources.read_net_gml(net2.name, path.join(execution_dir, 'net2.gml')).igraph.vs
 
         for p1id, p2id in self.iter_alignment_ids(execution_dir, file_name):
             yield net1_vs[p1id]['name'], net2_vs[p2id]['name']
 
-    def import_alignment(self, execution_dir, file_name='alignment-net1-net2.csv'):
-        return list(self.iter_alignment(execution_dir, file_name))
+    def import_alignment(self, net1, net2, execution_dir, file_name='alignment-net1-net2.csv'):
+        header = (net1.name, net2.name)
+        return header, list(self.iter_alignment(net1, net2, execution_dir, file_name))
 
-def import_fcopt_alignment(execution_dir):
+def import_fcopt_alignment(net1, net2, execution_dir):
     align_path = path.join(execution_dir, 'alignment-net1-net2.tab')
-    return {a : b for a, b in util.iter_csv(align_path, delimiter='\t')}
+    header = (net1.name, net2.name)
+    return header, [(a, b) for a, b in util.iter_csv(align_path, delimiter='\t')]
 

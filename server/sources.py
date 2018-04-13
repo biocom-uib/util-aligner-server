@@ -2,7 +2,6 @@
 import igraph
 import io
 import json
-from lazy_property import LazyProperty
 import numpy as np
 # import psycopg2
 from os import path
@@ -12,12 +11,18 @@ import util
 
 
 class Network(object):
-    def __init__(self):
-        pass
+    def __init__(self, name):
+        self.name = name
+        self._igraph = None
 
-    @LazyProperty
+    def already_has_igraph(self):
+        return self._igraph is not None
+
+    @property
     def igraph(self):
-        return self.to_igraph()
+        if self._igraph is None:
+            self._igraph = self.to_igraph()
+        return self._igraph
 
     def iter_edges(self):
         vs = self.igraph.vs
@@ -54,19 +59,19 @@ class Network(object):
         self.igraph.write_leda(file_path, names=names, weights=weights)
 
 class EdgeListNetwork(Network):
-    def __init__(self, edgelist):
-        super().__init__()
+    def __init__(self, name, edgelist):
+        super().__init__(name)
         self.edgelist = edgelist
 
     def to_igraph(self):
         return igraph.Graph.TupleList(self.iter_edges())
 
     def iter_edges(self):
-        return self.edgelist
+        return self.edgelist if not self.already_has_igraph() else super().iter_edges()
 
 class IgraphNetwork(Network):
-    def __init__(self, graph, simplify=True):
-        super().__init__()
+    def __init__(self, name, graph, simplify=True):
+        super().__init__(name)
         self.graph = graph
         if simplify:
             self.graph.simplify()
@@ -75,7 +80,8 @@ class IgraphNetwork(Network):
         return self.graph
 
 class StringDBNetwork(Network):
-    def __init__(self, proteins, edges):
+    def __init__(self, name, proteins, edges):
+        super().__init__(name)
         self.proteins = proteins
         self.edges = edges
 
@@ -93,21 +99,21 @@ class StringDBNetwork(Network):
         return graph
 
     def iter_edges(self):
-        return self.edges[:,:2]
+        return self.edges[:,:2] if not self.already_has_igraph() else super().iter_edges()
 
-def read_net_gml(net_path):
-    return IgraphNetwork(igraph.Graph.Read_GML(net_path))
+def read_net_gml(name, net_path):
+    return IgraphNetwork(name, igraph.Graph.Read_GML(net_path))
 
-def read_net_tsv_edgelist(net_path=None, string=None, simplify=True):
+def read_net_tsv_edgelist(name, net_path=None, string=None, simplify=True):
     if string is not None:
-        return EdgeListNetwork(list(util.iter_csv_fd(io.StringIO(string), delimiter='\t')))
+        return EdgeListNetwork(name, list(util.iter_csv_fd(io.StringIO(string), delimiter='\t')))
     elif net_path is not None:
-        return EdgeListNetwork(list(util.iter_csv(net_path, delimiter='\t')))
+        return EdgeListNetwork(name, list(util.iter_csv(net_path, delimiter='\t')))
     else:
         return None
 
 
-class ScoreMatrix(object):
+class BitscoreMatrix(object):
     def __init__(self):
         pass
 
@@ -116,7 +122,7 @@ class ScoreMatrix(object):
             kwargs['delimiter'] = '\t'
         util.write_csv(file_path, self.iter_tricol(by=by), **kwargs)
 
-class TricolScoreMatrix(ScoreMatrix):
+class TricolBitscoreMatrix(BitscoreMatrix):
     def __init__(self, tricol, net1=None, net2=None, by='name'):
         self.tricol = np.array(list(tricol))
         self.net1 = net1
@@ -153,13 +159,13 @@ class TricolScoreMatrix(ScoreMatrix):
                 yield p1[by], p2[by], score
 
 
-def read_tricol_scores(file_path, net1=None, net2=None, by='name', **kwargs):
+def read_tricol_bitscores(file_path, net1=None, net2=None, by='name', **kwargs):
     if 'delimiter' not in kwargs:
         kwargs['delimiter'] = '\t'
-    return TricolScoreMatrix(util.iter_csv(file_path, **kwargs), net1=net1, net2=net2, by=by)
+    return TricolBitscoreMatrix(util.iter_csv(file_path, **kwargs), net1=net1, net2=net2, by=by)
 
-def identity_scores(net, by='name'):
-    return TricolScoreMatrix([(v, v, 1) for v in net.iter_vertices(by=by)], by=by)
+def identity_bitscores(net, by='name'):
+    return TricolBitscoreMatrix([(v, v, 1) for v in net.iter_vertices(by=by)], by=by)
 
 
 class IsobaseLocal(object):
@@ -177,9 +183,9 @@ class IsobaseLocal(object):
         if not path.isfile(species_path):
             raise IOError(f'network file for {species_name} was not found')
 
-        return read_net_tsv_edgelist(species_path)
+        return read_net_tsv_edgelist(species_name, species_path)
 
-    def get_score_matrix(self, species1_name, species2_name=None, net1=None, net2=None):
+    def get_bitscore_matrix(self, species1_name, species2_name=None, net1=None, net2=None):
         self._check_valid_species(species1_name)
 
         if species2_name is None:
@@ -194,7 +200,7 @@ class IsobaseLocal(object):
             if not path.isfile(matrix_path):
                 raise IOError(f'score matrix file for {species1_name}-{species2_name} was not found')
 
-        return read_tricol_scores(matrix_path, net1=net1, net2=net2)
+        return read_tricol_bitscores(matrix_path, net1=net1, net2=net2)
 
     def get_ontology_mapping(self, networks=None):
         with open(path.join(self.base_path, 'go.json'), 'r') as go_f:
@@ -255,9 +261,9 @@ class StringDB(object):
                 where node_type_b = %s and combined_score >= %s;
                 """,
                 (species_id, min_combined_score))
-            return StringDBNetwork(proteins, np.array(cursor.fetchall()))
+            return StringDBNetwork(f'stringdb_{species_id}', proteins, np.array(cursor.fetchall()))
 
-    def get_score_matrix(self, net1_taxid, net2_taxid):
+    def get_bitscore_matrix(self, net1_taxid, net2_taxid):
         net1 = self.get_network(net1_taxid)
         net2 = self.get_network(net2_taxid) if net1_taxid != net2_taxid else net1
 
@@ -276,7 +282,7 @@ class StringDB(object):
 
         with self.conn.cursor() as cursor:
             values = np.array(list(fetch_all_homology(cursor)))
-            return TricolScoreMatrix(values, net1=net1, net2=net2, by='name')
+            return TricolBitscoreMatrix(values, net1=net1, net2=net2, by='name')
 
     def get_string_go_annotations(self, protein_ids=None, taxid=None):
         if protein_ids is not None:
