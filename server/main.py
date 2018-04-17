@@ -60,22 +60,34 @@ def process_alignment(data):
 
     aligner = aligners_dispatcher[aligner_name](**aligner_params)
 
-    results = aligner.run(
-        *run_args,
-        run_dir_base_path='/opt/running-alignments',
-        template_dir_base_path='/opt/aligner-templates')
+    try:
+        results = aligner.run(
+            *run_args,
+            run_dir_base_path='/opt/running-alignments',
+            template_dir_base_path='/opt/aligner-templates')
+    except:
+        logger.exception('exception was raised running alignment')
+        results = {'ok': False}
 
     response_data = {
         'db': db_name,
+
         'net1': net1_name,
+        'n_vert1': net1.igraph.vcount(),
+        'n_edges1': net1.igraph.ecount(),
+
         'net2': net2_name,
+        'n_vert2': net2.igraph.vcount(),
+        'n_edges2': net2.igraph.ecount(),
+
         'aligner': aligner_name,
         'aligner_params': aligner_params,
+
         'results': results,
         'timestamp': time.time(),
     }
 
-    if results['ok']:
+    if 'alignment' in results:
         response_data['scores'] = compute_scores(net1, net2, results, db.get_ontology_mapping([net1,net2]))
 
     result_id = insert_result_sync(response_data)

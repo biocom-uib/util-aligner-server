@@ -7,15 +7,8 @@ def compute_ec(net1, net2, alignment):
     min_es = net1.ecount() if net1.vcount() <= net2.vcount() else net2.ecount()
 
     result = {
-        'n_edges1': net1.ecount(),
-        'n_edges2': net2.ecount(),
-        'n_vert1': net1.vcount(),
-        'n_vert2': net2.vcount(),
         'min_n_edges': min_es
     }
-
-    if alignment is None:
-        return result
 
     alignment = dict(alignment)
 
@@ -88,31 +81,29 @@ def compute_ec(net1, net2, alignment):
 
     return result
 
+def count_annotations(net, ontology_mapping):
+    ann_freqs = Counter()
+    no_go_prots = set()
+
+    for p in net.igraph.vs:
+        p_name = p['name']
+        gos = frozenset(ontology_mapping.get(p_name, []))
+
+        ann_freqs[len(gos)] += 1
+
+        if not gos:
+            no_go_prots.add(p_name)
+
+    return ann_freqs, no_go_prots
+
 
 def compute_fc(net1, net2, alignment, ontology_mapping):
-    if alignment is None:
-        return dict()
-
     fc_sum = 0
     fc_len = 0
-
-    ann_freqs_net1 = Counter()
-    ann_freqs_net2 = Counter()
-
-    no_go_prots_net1 = set()
-    no_go_prots_net2 = set()
 
     for p1_name, p2_name in alignment:
         gos1 = frozenset(ontology_mapping.get(p1_name, []))
         gos2 = frozenset(ontology_mapping.get(p2_name, []))
-
-        ann_freqs_net1[len(gos1)] += 1
-        ann_freqs_net2[len(gos2)] += 1
-
-        if not gos1:
-            no_go_prots_net1.add(p1_name)
-        if not gos2:
-            no_go_prots_net2.add(p2_name)
 
         len_union = len(gos1.union(gos2))
 
@@ -120,6 +111,9 @@ def compute_fc(net1, net2, alignment, ontology_mapping):
             len_intersection = len(gos1.intersection(gos2))
             fc_sum += len_intersection / len_union
             fc_len += 1
+
+    ann_freqs_net1, no_go_prots_net1 = count_annotations(net1, ontology_mapping)
+    ann_freqs_net2, no_go_prots_net2 = count_annotations(net2, ontology_mapping)
 
     return {
         'fc_score': fc_sum/fc_len,
