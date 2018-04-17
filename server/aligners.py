@@ -162,14 +162,15 @@ class Hubalign(Aligner):
             raise ValueError('must provide a BLAST matrix whenever alpha < 1')
 
     def import_alignment(self, net1, net2, execution_dir, file_name='net1.tab-net2.tab.alignment'):
-        if net1.igraph.vcount() < net2.igraph.vcount():
-            header = (net1.name, net2.name)
-        else:
-            header = (net2.name, net1.name)
-
         align_path = path.join(execution_dir, file_name)
-        return header, [(a,b) for a, b in util.iter_csv(align_path, delimiter=' ', skipinitialspace=False)
-                              if a != '' and b != '']
+        alignment = [(a,b) for a, b in util.iter_csv(align_path, delimiter=' ', skipinitialspace=False)
+                           if a != '' and b != '']
+
+        header = (net1.name, net2.name)
+        if net1.igraph.vcount() > net2.igraph.vcount():
+            alignment = [(b,a) for a,b in alignment]
+
+        return header, alignment
 
 class Alignet(Aligner):
     def __init__(self, threads=1):

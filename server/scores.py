@@ -1,31 +1,45 @@
+from itertools import chain
+from collections import Counter
+
 def compute_ec(net1, net2, alignment):
     net1 = net1.igraph
     net2 = net2.igraph
+    min_es = net1.ecount() if net1.vcount() <= net2.vcount() else net2.ecount()
+
+    result = {
+        'n_edges1': net1.ecount(),
+        'n_edges2': net2.ecount(),
+        'n_vert1': net1.vcount(),
+        'n_vert2': net2.vcount(),
+        'min_n_edges': min_es
+    }
+
+    if alignment is None:
+        return result
+
     alignment = dict(alignment)
 
-    unknown_edges_net1 = set()
-    unknown_nodes_net1 = set()
+    unaligned_edges_net1 = set()
+    unaligned_nodes_net1 = set()
     unknown_nodes_net2 = set()
 
+    # compute EC and non_preserved_edges
+
     num_preserved_edges = 0
-    broken_edges = set()
+    non_preserved_edges = set()
 
     for e in net1.es:
         p1_id, p2_id = e.tuple
         p1_name, p2_name = net1.vs[p1_id]['name'], net1.vs[p2_id]['name']
 
-        if p1_name is None or p2_name is None:
-            sys.stderr.write(f'error: missing edge: {e}\n')
-            continue
-
         fp1_name, fp2_name = alignment.get(p1_name), alignment.get(p2_name)
         if fp1_name is None:
-            unknown_nodes_net1.add(p1_name)
-            unknown_edges_net1.add((p1_name, p2_name))
+            unaligned_nodes_net1.add(p1_name)
+            unaligned_edges_net1.add((p1_name, p2_name))
             continue
         if fp2_name is None:
-            unknown_nodes_net1.add(p2_name)
-            unknown_edges_net1.add((p1_name, p2_name))
+            unaligned_nodes_net1.add(p2_name)
+            unaligned_edges_net1.add((p1_name, p2_name))
             continue
 
         fp1s, fp2s = net2.vs.select(name=fp1_name), net2.vs.select(name=fp2_name)
@@ -37,33 +51,53 @@ def compute_ec(net1, net2, alignment):
             unknown_nodes_net2.add(fp2_name)
             continue
 
-        fp1_id, fp2_id = fp1s[0].index, fp2s[0].index
-
-        if net2.get_eid(fp1_id, fp2_id, directed=False, error=False) >= 0:
+        if net2.get_eid(fp1s[0].index, fp2s[0].index, directed=False, error=False) >= 0:
             num_preserved_edges += 1
         else:
-            broken_edges.add((p1_name, p2_name))
+            non_preserved_edges.add((p1_name, p2_name))
 
-    min_es = net1.ecount() if net1.vcount() <= net2.vcount() else net2.ecount()
+    def node_preimage(p_name):
+        selections = (net1.vs.select(name=preim_name) for preim_name, value in alignment.items() if value == p_name)
+        return [v.index for v in chain.from_iterable(selections)]
 
-    return {
-        'n_edges1': net1.ecount(),
-        'n_edges2': net2.ecount(),
-        'n_vert1': net1.vcount(),
-        'n_vert2': net2.vcount(),
-        'min_n_edges': min_es,
-        'unknown_edges_net1': list(unknown_edges_net1),
-        'unknown_nodes_net1': list(unknown_nodes_net1),
+    # compute non_reflected_edges
+
+    non_reflected_edges = set()
+
+    for e in net2.es:
+        p1_id, p2_id = e.tuple
+        p1_name, p2_name = net2.vs[p1_id]['name'], net2.vs[p2_id]['name']
+
+        preim_p1_ids = node_preimage(p1_name)
+        preim_p2_ids = node_preimage(p2_name)
+
+        if all(net1.get_eid(preim_p1_id, preim_p2_id, directed=False, error=False) < 0
+                for preim_p1_id in preim_p1_ids
+                for preim_p2_id in preim_p2_ids):
+            non_reflected_edges.add((p1_name, p2_name))
+
+    result.update({
+        'unaligned_edges_net1': list(unaligned_edges_net1),
+        'unaligned_nodes_net1': list(unaligned_nodes_net1),
         'unknown_nodes_net2': list(unknown_nodes_net2),
+        'non_preserved_edges': list(non_preserved_edges),
+        'non_reflected_edges': list(non_reflected_edges),
         'num_preserved_edges': num_preserved_edges,
-        'broken_edges': list(broken_edges),
         'ec_score': num_preserved_edges / min_es,
-    }
+    })
+
+    return result
 
 
 def compute_fc(net1, net2, alignment, ontology_mapping):
+    if alignment is None:
+        return dict()
+
     fc_sum = 0
     fc_len = 0
+
+    ann_freqs_net1 = Counter()
+    ann_freqs_net2 = Counter()
 
     no_go_prots_net1 = set()
     no_go_prots_net2 = set()
@@ -71,6 +105,9 @@ def compute_fc(net1, net2, alignment, ontology_mapping):
     for p1_name, p2_name in alignment:
         gos1 = frozenset(ontology_mapping.get(p1_name, []))
         gos2 = frozenset(ontology_mapping.get(p2_name, []))
+
+        ann_freqs_net1[len(gos1)] += 1
+        ann_freqs_net2[len(gos2)] += 1
 
         if not gos1:
             no_go_prots_net1.add(p1_name)
@@ -88,6 +125,8 @@ def compute_fc(net1, net2, alignment, ontology_mapping):
         'fc_score': fc_sum/fc_len,
         'unannotated_prots_net1': list(no_go_prots_net1),
         'unannotated_prots_net2': list(no_go_prots_net2),
+        'ann_freqs_net1': {str(ann_cnt): freq for ann_cnt, freq in ann_freqs_net1.items()},
+        'ann_freqs_net2': {str(ann_cnt): freq for ann_cnt, freq in ann_freqs_net2.items()}
     }
 
 
