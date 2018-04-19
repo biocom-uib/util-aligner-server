@@ -1,13 +1,13 @@
 #!/usr/bin/python3
+from asyncio import coroutine
 import igraph
 import io
 import json
 import numpy as np
-# import psycopg2
+import aiopg
 from os import path
 
 import util
-
 
 
 class Network(object):
@@ -124,7 +124,7 @@ class BitscoreMatrix(object):
 
 class TricolBitscoreMatrix(BitscoreMatrix):
     def __init__(self, tricol, net1=None, net2=None, by='name'):
-        self.tricol = np.array(list(tricol))
+        self.tricol = np.array(tricol)
         self.net1 = net1
         self.net2 = net2
         self.by = by
@@ -162,7 +162,7 @@ class TricolBitscoreMatrix(BitscoreMatrix):
 def read_tricol_bitscores(file_path, net1=None, net2=None, by='name', **kwargs):
     if 'delimiter' not in kwargs:
         kwargs['delimiter'] = '\t'
-    return TricolBitscoreMatrix(util.iter_csv(file_path, **kwargs), net1=net1, net2=net2, by=by)
+    return TricolBitscoreMatrix(list(util.iter_csv(file_path, **kwargs)), net1=net1, net2=net2, by=by)
 
 def identity_bitscores(net, by='name'):
     return TricolBitscoreMatrix([(v, v, 1) for v in net.iter_vertices(by=by)], by=by)
@@ -176,6 +176,7 @@ class IsobaseLocal(object):
         if not species_name.isalnum():
             raise ValueError(f'invalid species name: {species_name}')
 
+    @coroutine
     def get_network(self, species_name):
         self._check_valid_species(species_name)
         species_path = path.join(self.base_path, f'{species_name}.tab')
@@ -185,6 +186,7 @@ class IsobaseLocal(object):
 
         return read_net_tsv_edgelist(species_name, species_path)
 
+    @coroutine
     def get_bitscore_matrix(self, species1_name, species2_name=None, net1=None, net2=None):
         self._check_valid_species(species1_name)
 
@@ -202,106 +204,138 @@ class IsobaseLocal(object):
 
         return read_tricol_bitscores(matrix_path, net1=net1, net2=net2)
 
+    @coroutine
     def get_ontology_mapping(self, networks=None):
         with open(path.join(self.base_path, 'go.json'), 'r') as go_f:
             return json.load(go_f)
 
 class StringDB(object):
-    def __init__(self, host='localhost', port=5432, user='ppin', dbname='stringdb_raw'):
-        self.host = host
-        self.port = port
-        self.user = user
-        self.dbname = dbname
+    @staticmethod
+    async def init_pool(host='localhost', port=5432, user='ppin', dbname='stringdb_raw'):
+        return await aiopg.create_pool(host=host, port=port, user=user, dbname=dbname)
 
-    def connect(self):
-        self.conn = psycopg2.connect(host=self.host, port=self.port, user=self.user, dbname=self.dbname)
+    def __init__(self, host='localhost', port=5432, user='ppin', dbname='stringdb_raw', pool=None):
+        self.pool = pool
+        self.conn = None
+
+        if pool is not None:
+            self.host = host
+            self.port = port
+            self.user = user
+            self.dbname = dbname
+
+    async def connect(self):
+        if self.pool is None:
+            self.conn = await aiopg.connect(host=self.host, port=self.port, user=self.user, dbname=self.dbname)
 
     def disconnect(self):
-        if self.conn is not None:
+        if self.conn is not None and not self.conn.closed:
             self.conn.close()
             self.conn = None
 
-    def __enter__(self):
-        self.connect()
+    async def __aenter__(self):
+        await self.connect()
         return self
 
-    def __exit__(self):
-        self.disconnect()
+    async def __aexit__(self):
+        await self.disconnect()
 
-    def get_proteins(self, species_id):
-        with self.conn.cursor() as cursor:
-            cursor.execute("""
+    async def _get_cursor(self):
+        if self.pool is not None:
+            return await self.pool.cursor()
+        else:
+            return await self.conn.cursor()
+
+    async def get_proteins(self, species_id):
+        with await self._get_cursor() as cursor:
+            await cursor.execute("""
                 select protein_id, preferred_name
                 from items.proteins
-                where species_id = %s;
+                where species_id = %(species_id)s;
                 """,
-                (species_id,))
-            return dict(cursor)
+                {'species_id': species_id})
 
-    def get_protein_sequences(self, species_id):
-        with self.conn.cursor() as cursor:
-            cursor.execute("""
+            rows = await cursor.fetchall()
+
+        return dict(rows) if rows else None
+
+    async def get_protein_sequences(self, species_id):
+        with await self._get_cursor() as cursor:
+            await cursor.execute("""
                 select proteins.protein_id, sequences.sequence
                 from items.proteins as proteins
                 inner join items.proteins_sequences as sequences
                     on proteins.protein_id = sequences.protein_id
-                where proteins.species_id = %s;
+                where proteins.species_id = %(species_id)s;
                 """,
-                (species_id,))
-            return dict(cursor)
+                {'species_id': species_id})
 
-    def get_network(self, species_id, min_combined_score=0, proteins=None):
+            rows = await cursor.fetchall()
+
+        return dict(rows) if rows else None
+
+    async def get_network(self, species_id, min_combined_score=0, proteins=None):
         if proteins is None:
-            proteins = self.get_proteins(species_id)
+            proteins = await self.get_proteins(species_id)
 
-        with self.conn.cursor() as cursor:
-            cursor.execute("""
+        with await self._get_cursor() as cursor:
+            await cursor.execute("""
                 select node_id_a, node_id_b, combined_score
                 from network.node_node_links
-                where node_type_b = %s and combined_score >= %s;
+                where node_type_b = %(species_id)s and combined_score >= %(min_combined_score)s;
                 """,
-                (species_id, min_combined_score))
-            return StringDBNetwork(f'stringdb_{species_id}', proteins, np.array(cursor.fetchall()))
+                {'species_id': species_id, 'min_combined_score': min_combined_score})
 
-    def get_bitscore_matrix(self, net1_taxid, net2_taxid):
-        net1 = self.get_network(net1_taxid)
-        net2 = self.get_network(net2_taxid) if net1_taxid != net2_taxid else net1
+            edges = await cursor.fetchall()
 
-        def fetch_all_homology(cursor):
-            cursor.execute("""
+        return StringDBNetwork(f'stringdb_{species_id}', proteins, np.array(edges)) if edges else None
+
+    async def get_bitscore_matrix(self, net1_taxid, net2_taxid, net1=None, net2=None):
+        net1 = net1 or await self.get_network(net1_taxid)
+        net2 = net2 or (await self.get_network(net2_taxid) if net1_taxid != net2_taxid else net1)
+
+        with await self._get_cursor() as cursor:
+            await cursor.execute("""
                 select blast.protein_id_a, blast.protein_id_b, blast.bitscore
                 from (select protein_id
                       from items.proteins
-                      where species_id = %s) as proteins_a
+                      where species_id = %(net1_taxid)s) as proteins_a
                 left join homology.similarity_data as blast
                     on proteins_a.protein_id = blast.protein_id_a
-                where species_id_b = %s;
-                """, (net1_taxid, net2_taxid))
+                where species_id_b = %(net2_taxid)s;
+                """,
+                {'net1_taxid': net1_taxid, 'net2_taxid': net2_taxid})
 
-            return cursor.fetchall()
+            values = await cursor.fetchall()
 
-        with self.conn.cursor() as cursor:
-            values = np.array(list(fetch_all_homology(cursor)))
-            return TricolBitscoreMatrix(values, net1=net1, net2=net2, by='name')
+        return TricolBitscoreMatrix(np.array(values), net1=net1, net2=net2, by='name') if values else None
 
-    def get_string_go_annotations(self, protein_ids=None, taxid=None):
+    async def get_string_go_annotations(self, protein_ids=None, taxid=None):
         if protein_ids is not None:
-            with self.conn.cursor() as cursor:
-                cursor.execute("""
+            with await self._get_cursor() as cursor:
+                await cursor.execute("""
                     select protein_id, go_id
                     from go.explicit_by_id
-                    where protein_id = ANY(%s);
-                    """, (protein_ids,))
-                return cursor.fetchall()
+                    where protein_id = ANY(%(protein_ids)s);
+                    """,
+                    {'protein_ids': protein_ids})
+
+                rows = await cursor.fetchall()
+
+            return rows if rows else None
 
         if taxid is not None:
-            with self.conn.cursor() as cursor:
-                cursor.execute("""
+            with await self._get_cursor() as cursor:
+                await cursor.execute("""
                     select gos.protein_id, gos.go_id
                     from (select *
                           from items.proteins
-                          where species_id = %s) as proteins
+                          where species_id = %(species_id)s) as proteins
                     left join go.explicit_by_id as gos
                         on proteins.protein_id = gos.protein_id;
-                    """, (taxid,))
-                return cursor.fetchall()
+                    """,
+                    {'species_id': taxid})
+
+                rows = await cursor.fetchall()
+
+            return rows if rows else None

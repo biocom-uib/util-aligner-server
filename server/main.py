@@ -15,13 +15,12 @@ from sources import IsobaseLocal
 logger = logging.getLogger(__name__)
 
 
-def insert_result_sync(results):
-    loop = get_event_loop()
-    return loop.run_until_complete(insert_result(results))
-
-
 @app.task(name='process_alignment', queue='server_default')
-def process_alignment(data):
+def process_alignment_sync(data):
+    loop = get_event_loop()
+    return loop.run_until_complete(process_alignment(data))
+
+async def process_alignment(data):
     logger.info(f'processing alignment {data}')
 
     job_id = data['job_id']
@@ -34,13 +33,13 @@ def process_alignment(data):
 
     if db_name == 'isobase':
         db = IsobaseLocal('/opt/networks/isobase')
-        net1 = db.get_network(net1_name)
-        net2 = db.get_network(net2_name)
-        net1_net2_scores = db.get_bitscore_matrix(net1_name, net2_name, net1=net1, net2=net2)
+        net1 = await db.get_network(net1_name)
+        net2 = await db.get_network(net2_name)
+        net1_net2_scores = await db.get_bitscore_matrix(net1_name, net2_name, net1=net1, net2=net2)
 
         if aligner_name == 'alignet':
-            net1_scores = db.get_bitscore_matrix(net1_name)
-            net2_scores = db.get_bitscore_matrix(net2_name)
+            net1_scores = await db.get_bitscore_matrix(net1_name)
+            net2_scores = await db.get_bitscore_matrix(net2_name)
             run_args = (net1, net2, net1_scores, net2_scores, net1_net2_scores)
         else:
             run_args = (net1, net2, net1_net2_scores)
@@ -90,20 +89,15 @@ def process_alignment(data):
     if 'alignment' in results:
         response_data['scores'] = compute_scores(net1, net2, results, db.get_ontology_mapping([net1,net2]))
 
-    result_id = insert_result_sync(response_data)
+    result_id = await insert_result(response_data)
 
     logger.info(f'job {job_id} finished with result {result_id}')
     logger.debug(f'job result: {response_data}')
 
-    send_finished_job(job_id, result_id)
+    await send_finished_job(job_id, result_id)
 
 
-def send_finished_job(job_id, result_id):
-    loop = get_event_loop()
-    loop.run_until_complete(_send_finished_job(job_id, result_id))
-
-
-async def _send_finished_job(job_id, result_id):
+async def send_finished_job(job_id, result_id):
     headers = {'content-type': 'application/json'}
     data = {'job_id': job_id, 'result_id': str(result_id)}
 
