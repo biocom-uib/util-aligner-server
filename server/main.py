@@ -87,7 +87,8 @@ async def process_alignment(data):
     }
 
     if 'alignment' in results:
-        response_data['scores'] = compute_scores(net1, net2, results, db.get_ontology_mapping([net1,net2]))
+        ontology_mapping = await db.get_ontology_mapping([net1,net2])
+        response_data['scores'] = compute_scores(net1, net2, results, ontology_mapping)
 
     result_id = await insert_result(response_data)
 
