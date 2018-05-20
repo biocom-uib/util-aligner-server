@@ -1,17 +1,34 @@
-FROM python:3.6-alpine
+FROM ubuntu:16.04
 
 ARG APP_ENV=base
 
 ENV APP_ENV=$APP_ENV
 ENV PYTHONUNBUFFERED=1
 
-# Requirements have to be pulled and installed here, otherwise caching won't work
+RUN apt-get update \
+    && apt-get install -y software-properties-common \
+    && add-apt-repository ppa:jonathonf/python-3.6
+
 COPY ./requirements /requirements
-RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories \
-    && apk add --no-cache --virtual .build-deps gcc g++ make git \
-    && pip install -r /requirements/${APP_ENV}.txt \
-    && rm -rf /requirements \
-    && apk del .build-deps
+COPY ./r-requirements /r-requirements
+
+RUN apt-get update \
+    && apt-get -y install build-essential libxml2-dev zlib1g-dev python-dev pkg-config libffi6 libffi-dev libssl-dev libcurl4-openssl-dev \
+                          python3.6-dev python3-pip \
+                          r-base gfortran \
+                          libc6-i386 lib32stdc++6
+
+
+RUN python3.6 -m pip install pip --upgrade
+RUN python3.6 -m pip install wheel
+RUN pip install -r /requirements/${APP_ENV}.txt
+# RUN apt-get -y install libmariadb-client-lgpl-dev libssl-dev libcurl4-openssl-dev
+
+RUN Rscript --vanilla /r-requirements/${APP_ENV}.R
+
+CMD ["bash"]
+
 
 ENV PYTHONPATH=/opt/server
 WORKDIR /opt
+
