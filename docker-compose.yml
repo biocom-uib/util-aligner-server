@@ -7,55 +7,89 @@ services:
         - rabbitmq
         - mysql
         - mongo
+      command:
+        - celery
+        - -A
+        - server_queue
+        - worker
+        - -Q
+        - "${CELERY_TASK_DEFAULT_QUEUE}"
+        - -l
+        - info
       volumes:
         - .:/opt/:rw
+      environment:
+        - CELERY_BROKER_URL
+        - CELERY_TASK_DEFAULT_QUEUE
+        - CELERY_TASK_TIME_LIMIT
+        - FINISHED_JOB_URL
       networks:
-        - server-net
-        - util-net
+        server-net:
+          ipv4_address: 172.20.0.2
+          aliases: [server]
+        stringdb-net:
 
     mysql:
       image: mysql:5.7.17
       ports:
-        - 3308:3306
+        - 3306:3306
       command:
         - --character-set-server=utf8
         - --collation-server=utf8_unicode_ci
         - --skip-character-set-client-handshake
+        - --bind-address=0.0.0.0
       volumes:
         - mysql-data:/var/lib/mysql
         - ./dumps:/opt/dumps
+        - ./mysql-initdb.d:/docker-entrypoint-initdb.d:ro
       environment:
         - MYSQL_ROOT_PASSWORD=root
         - MYSQL_DATABASE=protein_db
-        - MYSQL_USER=puser
-        - MYSQL_PASSWORD=puser
       networks:
-        - util-net
-        - server-net
+        server-net:
+          ipv4_address: 172.20.0.3
+          aliases: [mysql]
 
     rabbitmq:
       image: rabbitmq:3-management-alpine
       ports:
         - 15672:15672
+        - 5672:5672
+      environment:
+        - RABBITMQ_DEFAULT_USER
+        - RABBITMQ_DEFAULT_PASS
       networks:
-        - util-net
-        - server-net
-    
+        server-net:
+          ipv4_address: 172.20.0.4
+          aliases: [rabbitmq]
+
     mongo:
       image: mongo:latest
-      command: ['mongod', '--storageEngine=mmapv1']
+      command:
+        - mongod
+        - --storageEngine=mmapv1
+        - --auth
+        - --bind_ip_all
+      security_opt:
+        - seccomp:seccomp_numa.json
+      ports:
+        - 27017:27017
       volumes:
         - mongo-data:/data/db
+        - ./mongo-initdb.d:/docker-entrypoint-initdb.d:ro
       networks:
-        - util-net
-        - server-net
-
+        server-net:
+          ipv4_address: 172.20.0.5
+          aliases: [mongo]
 
 volumes:
-  mysql-data: {}
-  mongo-data: {}
+  mysql-data:
+  mongo-data:
 
 networks:
-  server-net: {}
-  util-net:
+  server-net:
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+  stringdb-net:
     external: true
