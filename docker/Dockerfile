@@ -6,10 +6,6 @@ ENV APP_ENV=$APP_ENV
 ENV PYTHONUNBUFFERED=1
 ENV DEBIAN_FRONTEND=noninteractive
 
-# RUN apt-get update \
-#     && apt-get install -y software-properties-common \
-#     && add-apt-repository ppa:jonathonf/python-3.6
-
 COPY ./requirements /requirements
 COPY ./r-requirements /r-requirements
 
@@ -26,7 +22,6 @@ RUN apt-get update \
 RUN python3.6 -m pip install pip --upgrade
 RUN python3.6 -m pip install wheel
 RUN pip install -r /requirements/${APP_ENV}.txt
-# RUN apt-get -y install libmariadb-client-lgpl-dev libssl-dev libcurl4-openssl-dev
 
 RUN Rscript --vanilla /r-requirements/${APP_ENV}.R
 
