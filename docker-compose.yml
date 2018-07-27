@@ -2,7 +2,9 @@ version: '3'
 
 services:
     server:
-      image: bielr/util-aligner-server
+      build:
+        context: .
+        dockerfile: ./docker/Dockerfile
       depends_on:
         - rabbitmq
         - mysql
