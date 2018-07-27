@@ -1,5 +1,6 @@
 from itertools import chain
 from collections import Counter
+from util import edgelist_to_tsv
 
 def compute_ec(net1, net2, alignment):
     net1 = net1.igraph
@@ -75,8 +76,13 @@ def compute_ec(net1, net2, alignment):
         'unknown_nodes_net2': list(unknown_nodes_net2),
         'non_preserved_edges': list(non_preserved_edges),
         'non_reflected_edges': list(non_reflected_edges),
+        'num_unaligned_edges_net1': len(unaligned_edges_net1),
+        'num_unaligned_nodes_net1': len(unaligned_nodes_net1),
+        'num_unknown_nodes_net2': len(unknown_nodes_net2),
+        'num_non_preserved_edges': len(non_preserved_edges),
+        'num_non_reflected_edges': len(non_reflected_edges),
         'num_preserved_edges': num_preserved_edges,
-        'ec_score': num_preserved_edges/min_es if min_es > 0 else float('nan'),
+        'ec_score': num_preserved_edges/min_es if min_es > 0 else -1.0,
     })
 
     return result
@@ -116,7 +122,7 @@ def compute_fc(net1, net2, alignment, ontology_mapping):
     ann_freqs_net2, no_go_prots_net2 = count_annotations(net2, ontology_mapping)
 
     return {
-        'fc_score': fc_sum/fc_len if fc_len > 0 else float('nan'),
+        'fc_score': fc_sum/fc_len if fc_len > 0 else -1.0,
         'unannotated_prots_net1': list(no_go_prots_net1),
         'unannotated_prots_net2': list(no_go_prots_net2),
         'ann_freqs_net1': {str(ann_cnt): freq for ann_cnt, freq in ann_freqs_net1.items()},
@@ -132,3 +138,23 @@ def compute_scores(net1, net2, alignment, ontology_mapping):
         'ec_data': ec_data,
         'fc_data': fc_data
     }
+
+
+def split_score_data_as_tsvs(scores):
+    tsvs = dict()
+
+    ec_data = scores['ec_data']
+
+    tsvs['unaligned_edges_net1_tsv'] = edgelist_to_tsv(ec_data['unaligned_edges_net1'])
+    ec_data['unaligned_edges_net1'] = None
+
+    tsvs['unaligned_nodes_net1_tsv'] = edgelist_to_tsv(ec_data['unaligned_nodes_net1'])
+    ec_data['unaligned_nodes_net1'] = None
+
+    tsvs['non_preserved_edges_tsv'] = edgelist_to_tsv(ec_data['non_preserved_edges'])
+    ec_data['non_preserved_edges'] = None
+
+    tsvs['non_reflected_edges_tsv'] = edgelist_to_tsv(ec_data['non_reflected_edges'])
+    ec_data['non_reflected_edges'] = None
+
+    return tsvs
