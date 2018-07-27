@@ -76,7 +76,7 @@ def compute_ec(net1, net2, alignment):
         'non_preserved_edges': list(non_preserved_edges),
         'non_reflected_edges': list(non_reflected_edges),
         'num_preserved_edges': num_preserved_edges,
-        'ec_score': num_preserved_edges / min_es,
+        'ec_score': num_preserved_edges/min_es if min_es > 0 else float('nan'),
     })
 
     return result
@@ -116,7 +116,7 @@ def compute_fc(net1, net2, alignment, ontology_mapping):
     ann_freqs_net2, no_go_prots_net2 = count_annotations(net2, ontology_mapping)
 
     return {
-        'fc_score': fc_sum/fc_len,
+        'fc_score': fc_sum/fc_len if fc_len > 0 else float('nan'),
         'unannotated_prots_net1': list(no_go_prots_net1),
         'unannotated_prots_net2': list(no_go_prots_net2),
         'ann_freqs_net1': {str(ann_cnt): freq for ann_cnt, freq in ann_freqs_net1.items()},
@@ -124,9 +124,7 @@ def compute_fc(net1, net2, alignment, ontology_mapping):
     }
 
 
-def compute_scores(net1, net2, result, ontology_mapping):
-    alignment = result['alignment']
-
+def compute_scores(net1, net2, alignment, ontology_mapping):
     ec_data = compute_ec(net1, net2, alignment)
     fc_data = compute_fc(net1, net2, alignment, ontology_mapping)
 
