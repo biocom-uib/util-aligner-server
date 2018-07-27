@@ -7,6 +7,13 @@ db = client.util_aligner
 gridfs = motor.motor_asyncio.AsyncIOMotorGridFSBucket(db)
 
 
-async def insert_result(filename, results):
-    file_id = await gridfs.upload_from_stream(filename, ujson.dumps(results))
-    return file_id
+async def insert_result(job_id, results, files=dict()):
+    file_ids = dict()
+
+    for filename, content in files.items():
+        file_ids[filename] = await gridfs.upload_from_stream(f'{job_id}_{filename}', content.encode('utf-8'))
+
+    results['files'] = file_ids
+
+    result_id = await db.results.insert_one(results)
+    return result_id.inserted_id

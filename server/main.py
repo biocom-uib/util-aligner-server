@@ -7,9 +7,10 @@ from mongo import insert_result
 from os import path
 from server_queue import app
 import time
+from util import edgelist_to_tsv
 
 import aligners
-from scores import compute_scores
+from scores import compute_scores, split_score_data_as_tsvs
 from sources import IsobaseLocal, StringDB
 
 logger = logging.getLogger(__name__)
@@ -113,11 +114,20 @@ async def process_alignment(data):
         'timestamp': time.time(),
     }
 
-    if 'alignment' in results:
-        ontology_mapping = await db.get_ontology_mapping([net1, net2])
-        response_data['scores'] = compute_scores(net1, net2, results['alignment'], ontology_mapping)
+    result_files = dict()
 
-    result_id = await insert_result(job_id, response_data)
+    if 'alignment' in results:
+        alignment = results['alignment']
+
+        result_files['alignment_tsv'] = edgelist_to_tsv(alignment, header=results['alignment_header'])
+        results['alignment'] = None
+        del results['alignment_header']
+
+        ontology_mapping = await db.get_ontology_mapping([net1, net2])
+        response_data['scores'] = compute_scores(net1, net2, alignment, ontology_mapping)
+        result_files.update(split_score_data_as_tsvs(response_data['scores']))
+
+    result_id = await insert_result(job_id, response_data, result_files)
 
     logger.info(f'[{job_id}] finished with result {result_id}')
     logger.debug(f'[{job_id}] job result: {response_data}')

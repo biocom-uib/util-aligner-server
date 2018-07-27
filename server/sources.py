@@ -418,23 +418,26 @@ class StringDB(object):
     async def get_bitscore_matrix(self, net1, net2):
         async with self._get_cursor() as cursor:
             await cursor.execute("""
+                with
+                    net1_protein_ids as (select unnest(%(net1_protein_ids)s) net1_prot_ids),
+                    net2_protein_ids as (select unnest(%(net2_protein_ids)s) net2_prot_ids)
                 select
                   protein_id_a, protein_id_b, bitscore
                 from
-                  homology.blast_data
+                  homology.blast_data blast
+                  inner join
+                    net1_protein_ids on (blast.protein_id_a = net1_protein_ids.net1_prot_ids)
+                  inner join
+                    net2_protein_ids on (blast.protein_id_b = net2_protein_ids.net2_prot_ids)
                 where
                   species_id_a in %(net1_species_ids)s
                   and
                   species_id_b in %(net2_species_ids)s
-                  and
-                  protein_id_a in %(net1_protein_ids)s
-                  and
-                  protein_id_b in %(net2_protein_ids)s;
                 """,
                 {'net1_species_ids': tuple(await net1.get_species(self)),
                  'net2_species_ids': tuple(await net2.get_species(self)),
-                 'net1_protein_ids': tuple(net1.string_ids),
-                 'net1_protein_ids': tuple(net1.string_ids)})
+                 'net1_protein_ids': list(net1.string_ids),
+                 'net2_protein_ids': list(net1.string_ids)})
 
             values = await cursor.fetchall()
 

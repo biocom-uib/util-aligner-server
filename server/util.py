@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 import csv
+from io import StringIO
 
 def iter_csv_fd(f, **kwargs):
     if 'skipinitialspace' not in kwargs and kwargs.get('delimiter',' ') == ' ':
@@ -22,3 +23,13 @@ def write_csv(file_path, records, **kwargs):
         for record in records:
             writer.writerow(record)
 
+def edgelist_to_tsv(edgelist, header=[]):
+    f = StringIO()
+
+    writer = csv.writer(f, delimiter='\t')
+
+    if header:
+        writer.writerow(header)
+    writer.writerows(edgelist)
+
+    return f.getvalue()
