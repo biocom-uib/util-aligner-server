@@ -117,7 +117,7 @@ async def process_alignment(data):
         ontology_mapping = await db.get_ontology_mapping([net1, net2])
         response_data['scores'] = compute_scores(net1, net2, results['alignment'], ontology_mapping)
 
-    result_id = await insert_result(response_data)
+    result_id = await insert_result(job_id, response_data)
 
     logger.info(f'[{job_id}] finished with result {result_id}')
     logger.debug(f'[{job_id}] job result: {response_data}')
