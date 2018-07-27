@@ -10,7 +10,7 @@ import time
 
 import aligners
 from scores import compute_scores
-from sources import IsobaseLocal
+from sources import IsobaseLocal, StringDB
 
 logger = logging.getLogger(__name__)
 
@@ -26,25 +26,52 @@ async def process_alignment(data):
     job_id = data['job_id']
 
     db_name = data['db'].lower()
-    net1_name = data['net1']
-    net2_name = data['net2']
+    net1_desc = data['net1']
+    net2_desc = data['net2']
     aligner_name = data['aligner'].lower()
     aligner_params = data.get('aligner_params', dict())
 
     if db_name == 'isobase':
         db = IsobaseLocal('/opt/networks/isobase')
-        net1 = await db.get_network(net1_name)
-        net2 = await db.get_network(net2_name)
-        net1_net2_scores = await db.get_bitscore_matrix(net1_name, net2_name, net1=net1, net2=net2)
+
+        net1 = await db.get_network(net1_desc)
+        net2 = await db.get_network(net2_desc)
+        net1_net2_scores = await db.get_bitscore_matrix(net1, net2)
 
         if aligner_name == 'alignet':
-            net1_scores = await db.get_bitscore_matrix(net1_name)
-            net2_scores = await db.get_bitscore_matrix(net2_name)
+            net1_scores = await db.get_bitscore_matrix(net1, net1)
+            net2_scores = await db.get_bitscore_matrix(net2, net2)
             run_args = (net1, net2, net1_scores, net2_scores, net1_net2_scores)
         else:
             run_args = (net1, net2, net1_net2_scores)
+
+    elif db_name == 'stringdb':
+        db = StringDB()
+        await db.connect()
+
+        logger.info(f'[{job_id}] fetching data')
+
+        if net1_desc['species_id'] >= 0:
+            net1 = await db.get_network(net1_desc['species_id'], score_thresholds=net1_desc['score_thresholds'])
+        else:
+            net1 = await db.build_custom_network(net1_desc['edges'])
+
+        if net2_desc['species_id'] >= 0:
+            net2 = await db.get_network(net2_desc['species_id'], score_thresholds=net2_desc['score_thresholds'])
+        else:
+            net2 = await db.build_custom_network(net2_desc['edges'])
+
+        net1_net2_scores = await db.get_bitscore_matrix(net1, net2)
+
+        if aligner_name == 'alignet':
+            net1_scores = await db.get_bitscore_matrix(net1, net1)
+            net2_scores = await db.get_bitscore_matrix(net2, net2)
+            run_args = (net1, net2, net1_scores, net2_scores, net1_net2_scores)
+        else:
+            run_args = (net1, net2, net1_net2_scores)
+
     else:
-        raise ValueError(f'database not supported: {db_name}')
+        raise ValueError(f'[{job_id}] database not supported: {db_name}')
 
     aligners_dispatcher = {
         'alignet':  aligners.Alignet,
@@ -55,7 +82,7 @@ async def process_alignment(data):
     }
 
     if aligner_name not in aligners_dispatcher:
-        raise ValueError(f'aligner not supported: {aligner_name}')
+        raise ValueError(f'[{job_id}] aligner not supported: {aligner_name}')
 
     aligner = aligners_dispatcher[aligner_name](**aligner_params)
 
@@ -65,17 +92,17 @@ async def process_alignment(data):
             run_dir_base_path='/opt/running-alignments',
             template_dir_base_path='/opt/aligner-templates')
     except:
-        logger.exception('exception was raised running alignment')
+        logger.exception(f'[{job_id}] exception was raised running alignment')
         results = {'ok': False}
 
     response_data = {
         'db': db_name,
 
-        'net1': net1_name,
+        'net1': net1_desc,
         'n_vert1': net1.igraph.vcount(),
         'n_edges1': net1.igraph.ecount(),
 
-        'net2': net2_name,
+        'net2': net2_desc,
         'n_vert2': net2.igraph.vcount(),
         'n_edges2': net2.igraph.ecount(),
 
@@ -87,13 +114,13 @@ async def process_alignment(data):
     }
 
     if 'alignment' in results:
-        ontology_mapping = await db.get_ontology_mapping([net1,net2])
-        response_data['scores'] = compute_scores(net1, net2, results, ontology_mapping)
+        ontology_mapping = await db.get_ontology_mapping([net1, net2])
+        response_data['scores'] = compute_scores(net1, net2, results['alignment'], ontology_mapping)
 
     result_id = await insert_result(response_data)
 
-    logger.info(f'job {job_id} finished with result {result_id}')
-    logger.debug(f'job result: {response_data}')
+    logger.info(f'[{job_id}] finished with result {result_id}')
+    logger.debug(f'[{job_id}] job result: {response_data}')
 
     await send_finished_job(job_id, result_id)
 
