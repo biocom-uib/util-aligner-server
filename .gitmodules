@@ -1,0 +1,9 @@
+[submodule "libs/semantic-similarity"]
+	path = libs/semantic-similarity
+	url = https://github.com/bielr/semantic-similarity.git
+[submodule "libs/geneontology-tools"]
+	path = libs/geneontology-tools
+	url = https://github.com/bielr/geneontology-tools.git
+[submodule "libs/stringdb-tools"]
+	path = libs/stringdb-tools
+	url = https://github.com/bielr/stringdb-tools.git

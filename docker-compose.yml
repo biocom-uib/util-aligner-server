@@ -18,6 +18,8 @@ services:
         - "${CELERY_TASK_DEFAULT_QUEUE}"
         - -l
         - info
+        - -c
+        - "8"
       volumes:
         - .:/opt/:rw
       environment:
@@ -30,6 +32,7 @@ services:
           ipv4_address: 172.20.0.2
           aliases: [server]
         stringdb-net:
+        geneontology-net:
 
     mysql:
       image: mysql:5.7.17
@@ -94,4 +97,6 @@ networks:
       config:
         - subnet: 172.20.0.0/24
   stringdb-net:
+    external: true
+  geneontology-net:
     external: true

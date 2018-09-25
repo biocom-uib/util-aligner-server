@@ -14,7 +14,6 @@ RUN Rscript --vanilla /r-requirements/${APP_ENV}.R
 
 CMD ["bash"]
 
-
-ENV PYTHONPATH=/opt/server
+ENV PYTHONPATH /opt/server:/opt/libs/stringdb-tools/scripts:/opt/libs/geneontology-tools/scripts:/opt/libs/semantic-similarity
 WORKDIR /opt
 
