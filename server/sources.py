@@ -35,7 +35,7 @@ class Network(object):
             yield from self.igraph.vs
         elif by == 'index':
             yield from range(len(self.igraph.vs))
-        elif by == 'name':
+        else:
             for v in self.igraph.vs:
                 yield v[by]
 
@@ -101,7 +101,9 @@ class StringDBNetwork(Network):
         prots = self.protein_names
         for v in graph.vs:
             string_id = v['name'] # better have unique names
-            v['name'] = str(string_id) # igraph has some bugs regarding non-str names (https://github.com/igraph/python-igraph/issues/73#issuecomment-203077381)
+            # igraph has some bugs regarding non-str names (https://github.com/igraph/python-igraph/issues/73#issuecomment-203077381)
+            v['name'] = f'v{string_id}'
+            v['string_id'] = string_id
             v['prot_name'] = prots[string_id] # not necessarily unique, e.g. NGR_c13120
 
         return graph
@@ -114,7 +116,7 @@ class StringDBNetwork(Network):
 
     @property
     def string_ids(self):
-        return {int(v) for v in self.iter_vertices(by='name')}
+        return {int(v) for v in self.iter_vertices(by='string_id')}
 
     def iter_edges(self):
         return self.edges if not self.already_has_igraph() else super().iter_edges()
@@ -175,6 +177,18 @@ class TricolBitscoreMatrix(BitscoreMatrix):
         else:
             for p1, p2, score in self.iter_tricol(by='object'):
                 yield p1[by], p2[by], score
+
+class StringDBBitscoreMatrix(TricolBitscoreMatrix):
+    def __init__(self, tricol, net1=None, net2=None, by='string_id'):
+        super().__init__(tricol, net1, net2, by)
+
+    def iter_tricol(self, by='name'):
+        # just an optimization
+        if by == 'name':
+            for p1, p2, score in super().iter_tricol(by='string_id'):
+                yield f'v{p1}', f'v{p2}', score
+        else:
+            yield from super().iter_tricol(by=by)
 
 
 def read_tricol_bitscores(file_path, net1=None, net2=None, by='name', **kwargs):
@@ -399,7 +413,6 @@ class StringDB(object):
                     """;
 
 
-            print(sql)
             await cursor.execute(sql, {'species_id': species_id})
 
             edges = await cursor.fetchall()
@@ -419,8 +432,8 @@ class StringDB(object):
         async with self._get_cursor() as cursor:
             await cursor.execute("""
                 with
-                    net1_protein_ids as (select unnest(%(net1_protein_ids)s) net1_prot_ids),
-                    net2_protein_ids as (select unnest(%(net2_protein_ids)s) net2_prot_ids)
+                    net1_protein_ids as (select unnest(%(net1_protein_ids)s :: integer[]) net1_prot_ids),
+                    net2_protein_ids as (select unnest(%(net2_protein_ids)s :: integer[]) net2_prot_ids)
                 select
                   protein_id_a, protein_id_b, bitscore
                 from
@@ -437,11 +450,16 @@ class StringDB(object):
                 {'net1_species_ids': tuple(await net1.get_species(self)),
                  'net2_species_ids': tuple(await net2.get_species(self)),
                  'net1_protein_ids': list(net1.string_ids),
-                 'net2_protein_ids': list(net1.string_ids)})
+                 'net2_protein_ids': list(net2.string_ids)})
 
             values = await cursor.fetchall()
 
-        return TricolBitscoreMatrix(np.array(values), net1=net1, net2=net2, by='name')
+        array_dtype = [('protein_id_a', 'i4'), ('protein_id_b', 'i4'), ('bitscore', 'f4')]
+
+        if values:
+            return StringDBBitscoreMatrix(np.array(values, dtype=array_dtype), net1=net1, net2=net2, by='string_id')
+        else:
+            return None
 
     async def get_ontology_mapping(self, networks):
         species_ids = [species for net in networks
@@ -450,7 +468,7 @@ class StringDB(object):
         async with self._get_cursor() as cursor:
             await cursor.execute("""
                 select
-                  string_id,
+                  'v' || string_id,
                   array_agg(distinct go_id)
                 from
                   mapping.gene_ontology
@@ -467,12 +485,11 @@ class StringDB(object):
 
         return dict(rows)
 
-
     async def get_string_go_annotations(self, protein_ids=None, taxid=None):
         if protein_ids is not None:
             async with self._get_cursor() as cursor:
                 await cursor.execute("""
-                    select protein_id, go_id
+                    select 'v' || protein_id, go_id
                     from go.explicit_by_id
                     where protein_id = ANY(%(protein_ids)s);
                     """,
@@ -485,7 +502,7 @@ class StringDB(object):
         if taxid is not None:
             async with self._get_cursor() as cursor:
                 await cursor.execute("""
-                    select gos.protein_id, gos.go_id
+                    select 'v' || gos.protein_id, gos.go_id
                     from (select *
                           from items.proteins
                           where species_id = %(species_id)s) as proteins

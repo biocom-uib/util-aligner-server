@@ -7,7 +7,7 @@ from mongo import insert_result
 from os import path
 from server_queue import app
 import time
-from util import edgelist_to_tsv
+from util import write_tsv_to_string
 
 import aligners
 from scores import compute_scores, split_score_data_as_tsvs
@@ -32,80 +32,94 @@ async def process_alignment(data):
     aligner_name = data['aligner'].lower()
     aligner_params = data.get('aligner_params', dict())
 
-    if db_name == 'isobase':
-        db = IsobaseLocal('/opt/networks/isobase')
-
-        net1 = await db.get_network(net1_desc)
-        net2 = await db.get_network(net2_desc)
-        net1_net2_scores = await db.get_bitscore_matrix(net1, net2)
-
-        if aligner_name == 'alignet':
-            net1_scores = await db.get_bitscore_matrix(net1, net1)
-            net2_scores = await db.get_bitscore_matrix(net2, net2)
-            run_args = (net1, net2, net1_scores, net2_scores, net1_net2_scores)
-        else:
-            run_args = (net1, net2, net1_net2_scores)
-
-    elif db_name == 'stringdb':
-        db = StringDB()
-        await db.connect()
-
-        logger.info(f'[{job_id}] fetching data')
-
-        if net1_desc['species_id'] >= 0:
-            net1 = await db.get_network(net1_desc['species_id'], score_thresholds=net1_desc['score_thresholds'])
-        else:
-            net1 = await db.build_custom_network(net1_desc['edges'])
-
-        if net2_desc['species_id'] >= 0:
-            net2 = await db.get_network(net2_desc['species_id'], score_thresholds=net2_desc['score_thresholds'])
-        else:
-            net2 = await db.build_custom_network(net2_desc['edges'])
-
-        net1_net2_scores = await db.get_bitscore_matrix(net1, net2)
-
-        if aligner_name == 'alignet':
-            net1_scores = await db.get_bitscore_matrix(net1, net1)
-            net2_scores = await db.get_bitscore_matrix(net2, net2)
-            run_args = (net1, net2, net1_scores, net2_scores, net1_net2_scores)
-        else:
-            run_args = (net1, net2, net1_net2_scores)
-
-    else:
-        raise ValueError(f'[{job_id}] database not supported: {db_name}')
-
-    aligners_dispatcher = {
-        'alignet':  aligners.Alignet,
-        'hubalign': aligners.Hubalign,
-        'l-graal':  aligners.LGraal,
-        'pinalog':  aligners.Pinalog,
-        'spinal':   aligners.Spinal,
-    }
-
-    if aligner_name not in aligners_dispatcher:
-        raise ValueError(f'[{job_id}] aligner not supported: {aligner_name}')
-
-    aligner = aligners_dispatcher[aligner_name](**aligner_params)
+    net1 = None
+    net2 = None
 
     try:
+        if db_name == 'isobase':
+            db = IsobaseLocal('/opt/local-db/isobase')
+
+            net1 = await db.get_network(net1_desc)
+            net2 = await db.get_network(net2_desc)
+            net1_net2_scores = await db.get_bitscore_matrix(net1, net2)
+
+            if aligner_name == 'alignet':
+                net1_scores = await db.get_bitscore_matrix(net1, net1)
+                net2_scores = await db.get_bitscore_matrix(net2, net2)
+                run_args = (net1, net2, net1_scores, net2_scores, net1_net2_scores)
+            else:
+                run_args = (net1, net2, net1_net2_scores)
+
+        elif db_name == 'stringdb':
+            db = StringDB()
+            await db.connect()
+
+            logger.info(f'[{job_id}] fetching data')
+
+            if net1_desc['species_id'] >= 0:
+                net1 = await db.get_network(net1_desc['species_id'], score_thresholds=net1_desc['score_thresholds'])
+            else:
+                net1 = await db.build_custom_network(net1_desc['edges'])
+
+            if net2_desc['species_id'] >= 0:
+                net2 = await db.get_network(net2_desc['species_id'], score_thresholds=net2_desc['score_thresholds'])
+            else:
+                net2 = await db.build_custom_network(net2_desc['edges'])
+
+            net1_net2_scores = await db.get_bitscore_matrix(net1, net2)
+
+            if net1_net2_scores is None:
+                raise ValueError('bitscore matrix not available for the selected network pair')
+
+            if aligner_name == 'alignet':
+                net1_scores = await db.get_bitscore_matrix(net1, net1)
+                if net1_scores is None:
+                    raise ValueError('bitscore matrix not available for the first network')
+
+                net2_scores = await db.get_bitscore_matrix(net2, net2)
+                if net2_scores is None:
+                    raise ValueError('bitscore matrix not available for the second network')
+
+                run_args = (net1, net2, net1_scores, net2_scores, net1_net2_scores)
+            else:
+                run_args = (net1, net2, net1_net2_scores)
+
+        else:
+            raise ValueError(f'database not supported: {db_name}')
+
+        aligners_dispatcher = {
+            'alignet':  aligners.Alignet,
+            'hubalign': aligners.Hubalign,
+            'l-graal':  aligners.LGraal,
+            'pinalog':  aligners.Pinalog,
+            'spinal':   aligners.Spinal,
+        }
+
+        if aligner_name not in aligners_dispatcher:
+            raise ValueError(f'aligner not supported: {aligner_name}')
+
+        aligner = aligners_dispatcher[aligner_name](**aligner_params)
+
         results = aligner.run(
             *run_args,
             run_dir_base_path='/opt/running-alignments',
             template_dir_base_path='/opt/aligner-templates')
-    except:
+
+        results['exception'] = None
+    except Exception as e:
         logger.exception(f'[{job_id}] exception was raised running alignment')
-        results = {'ok': False}
+        results = {'ok': False, 'exception': str(e)}
 
     response_data = {
         'db': db_name,
 
         'net1': net1_desc,
-        'n_vert1': net1.igraph.vcount(),
-        'n_edges1': net1.igraph.ecount(),
+        'n_vert1': net1.igraph.vcount() if net1 is not None else -1,
+        'n_edges1': net1.igraph.ecount() if net1 is not None else -1,
 
         'net2': net2_desc,
-        'n_vert2': net2.igraph.vcount(),
-        'n_edges2': net2.igraph.ecount(),
+        'n_vert2': net2.igraph.vcount() if net2 is not None else -1,
+        'n_edges2': net2.igraph.ecount() if net2 is not None else -1,
 
         'aligner': aligner_name,
         'aligner_params': aligner_params,
@@ -119,11 +133,14 @@ async def process_alignment(data):
     if 'alignment' in results:
         alignment = results['alignment']
 
-        result_files['alignment_tsv'] = edgelist_to_tsv(alignment, header=results['alignment_header'])
+        result_files['alignment_tsv'] = write_tsv_to_string(alignment, header=results['alignment_header'])
         results['alignment'] = None
         del results['alignment_header']
 
+        logger.info(f'[{job_id}] retrieving GO annotations')
         ontology_mapping = await db.get_ontology_mapping([net1, net2])
+
+        logger.info(f'[{job_id}] computing scores')
         response_data['scores'] = compute_scores(net1, net2, alignment, ontology_mapping)
         result_files.update(split_score_data_as_tsvs(response_data['scores']))
 

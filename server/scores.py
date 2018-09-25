@@ -1,8 +1,14 @@
-from itertools import chain
 from collections import Counter
-from util import edgelist_to_tsv
+from itertools import chain
+from math import inf, isinf
 
-def compute_ec(net1, net2, alignment):
+from go_tools import get_curated_frequencies_path
+import geneontology as godb
+import semantic_similarity as semsim
+
+from util import write_tsv_to_string
+
+def compute_ec_scores(net1, net2, alignment):
     net1 = net1.igraph
     net2 = net2.igraph
     min_es = net1.ecount() if net1.vcount() <= net2.vcount() else net2.ecount()
@@ -103,26 +109,73 @@ def count_annotations(net, ontology_mapping):
     return ann_freqs, no_go_prots
 
 
-def compute_fc(net1, net2, alignment, ontology_mapping):
+def compute_fc(net1, net2, alignment, ontology_mapping, dissim):
     fc_sum = 0
     fc_len = 0
+
+    results = []
 
     for p1_name, p2_name in alignment:
         gos1 = frozenset(ontology_mapping.get(p1_name, []))
         gos2 = frozenset(ontology_mapping.get(p2_name, []))
 
-        len_union = len(gos1.union(gos2))
+        fc = dissim(gos1, gos2)
 
-        if len_union > 0:
-            len_intersection = len(gos1.intersection(gos2))
-            fc_sum += len_intersection / len_union
+        if fc is not None:
+            results.append((p1_name, p2_name, fc))
+            fc_sum += fc
             fc_len += 1
+
+    fc_avg = fc_sum/fc_len if fc_len > 0 else -1
+    return results, fc_avg
+
+
+def jaccard_dissim(gos1, gos2):
+    if gos1 and gos2:
+        len_intersection = len(gos1.intersection(gos2))
+        len_union = len(gos1.union(gos2))
+        return len_intersection / len_union
+    else:
+        return None
+
+def init_hrss_sim(agg = semsim.agg_bma_max):
+    import geneontology as godb
+
+    go_onto = godb.load_go_obo()
+    go_is_a_g = godb.onto_rel_graph(go_onto)
+
+    ic = semsim.init_ic(get_curated_frequencies_path())
+
+    def pair_dissim(go1, go2):
+        return semsim.get_hrss_sim(go_is_a_g, ic, go1, go2)
+
+    def agg_dissim(gos1, gos2):
+        return agg(pair_dissim, gos1, gos2)
+
+    def dissim(gos1, gos2):
+        if gos1 and gos2:
+            r = min(semsim.namespace_wise_comparisons(go_onto, agg_dissim, gos1, gos2), default=inf)
+            return r if not isinf(r) else None
+        else:
+            return None
+
+    return dissim
+
+hrss_bma_sim = init_hrss_sim(agg = semsim.agg_bma_max)
+
+def compute_fc_scores(net1, net2, alignment, ontology_mapping):
+    fc_values_jaccard, fc_jaccard = compute_fc(net1, net2, alignment, ontology_mapping, jaccard_dissim)
+
+    fc_values_hrss_bma, fc_hrss_bma = compute_fc(net1, net2, alignment, ontology_mapping, hrss_bma_sim)
 
     ann_freqs_net1, no_go_prots_net1 = count_annotations(net1, ontology_mapping)
     ann_freqs_net2, no_go_prots_net2 = count_annotations(net2, ontology_mapping)
 
     return {
-        'fc_score': fc_sum/fc_len if fc_len > 0 else -1.0,
+        'fc_score_jaccard': fc_jaccard,
+        'fc_values_jaccard': fc_values_jaccard,
+        'fc_score_hrss_bma': fc_hrss_bma,
+        'fc_values_hrss_bma': fc_values_hrss_bma,
         'unannotated_prots_net1': list(no_go_prots_net1),
         'unannotated_prots_net2': list(no_go_prots_net2),
         'ann_freqs_net1': {str(ann_cnt): freq for ann_cnt, freq in ann_freqs_net1.items()},
@@ -131,8 +184,8 @@ def compute_fc(net1, net2, alignment, ontology_mapping):
 
 
 def compute_scores(net1, net2, alignment, ontology_mapping):
-    ec_data = compute_ec(net1, net2, alignment)
-    fc_data = compute_fc(net1, net2, alignment, ontology_mapping)
+    ec_data = compute_ec_scores(net1, net2, alignment)
+    fc_data = compute_fc_scores(net1, net2, alignment, ontology_mapping)
 
     return {
         'ec_data': ec_data,
@@ -143,18 +196,20 @@ def compute_scores(net1, net2, alignment, ontology_mapping):
 def split_score_data_as_tsvs(scores):
     tsvs = dict()
 
+    def split_key(src_dict, key):
+        tsvs[key + '_tsv'] = write_tsv_to_string(src_dict[key])
+        src_dict[key] = None
+
     ec_data = scores['ec_data']
 
-    tsvs['unaligned_edges_net1_tsv'] = edgelist_to_tsv(ec_data['unaligned_edges_net1'])
-    ec_data['unaligned_edges_net1'] = None
+    split_key(ec_data, 'unaligned_edges_net1')
+    split_key(ec_data, 'unaligned_nodes_net1')
+    split_key(ec_data, 'non_preserved_edges')
+    split_key(ec_data, 'non_reflected_edges')
 
-    tsvs['unaligned_nodes_net1_tsv'] = edgelist_to_tsv(ec_data['unaligned_nodes_net1'])
-    ec_data['unaligned_nodes_net1'] = None
+    fc_data = scores['fc_data']
 
-    tsvs['non_preserved_edges_tsv'] = edgelist_to_tsv(ec_data['non_preserved_edges'])
-    ec_data['non_preserved_edges'] = None
-
-    tsvs['non_reflected_edges_tsv'] = edgelist_to_tsv(ec_data['non_reflected_edges'])
-    ec_data['non_reflected_edges'] = None
+    split_key(fc_data, 'fc_values_jaccard')
+    split_key(fc_data, 'fc_values_hrss_bma')
 
     return tsvs

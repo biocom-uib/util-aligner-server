@@ -58,6 +58,8 @@ class Aligner(object):
     def run(self, net1, net2, *args, run_dir_base_path='run', template_dir_base_path='template', max_trials=50):
         os.makedirs(run_dir_base_path, exist_ok=True)
 
+        # run_dir_path =  tempfile.mkdtemp(dir=run_dir_base_path, prefix=self.name + '-'):
+
         with tempfile.TemporaryDirectory(dir=run_dir_base_path, prefix=self.name + '-') as run_dir_path:
             self.logger.info(f'run_{self.name} @ {run_dir_path}: setting up required files')
 
@@ -158,7 +160,7 @@ class Hubalign(Aligner):
             self.logger.debug(f'run_{self.name} @ {run_dir_path}: writing blast-net1-net2.tab')
             blast_path = path.join(run_dir_path, 'blast-net1-net2.tab')
             blast_net1_net2.write_tricol(blast_path)
-        elif alpha < 1:
+        elif self.alpha < 1:
             raise ValueError('must provide a BLAST matrix whenever alpha < 1')
 
     def import_alignment(self, net1, net2, execution_dir, file_name='net1.tab-net2.tab.alignment'):

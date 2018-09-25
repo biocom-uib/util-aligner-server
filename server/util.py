@@ -23,13 +23,13 @@ def write_csv(file_path, records, **kwargs):
         for record in records:
             writer.writerow(record)
 
-def edgelist_to_tsv(edgelist, header=[]):
+def write_tsv_to_string(tuple_list, header=[]):
     f = StringIO()
 
     writer = csv.writer(f, delimiter='\t')
 
     if header:
         writer.writerow(header)
-    writer.writerows(edgelist)
+    writer.writerows(tuple_list)
 
     return f.getvalue()
