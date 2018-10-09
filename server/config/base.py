@@ -30,5 +30,4 @@ CELERY_TASK_DEFAULT_EXCHANGE = 'celery'
 CELERY_TASK_DEFAULT_EXCHANGE_TYPE = 'direct'
 
 
-FINISHED_JOB_URL = env('FINISHED_JOB_URL',
-                       'http://api:8080/util-aligner/finished-job')
+FINISHED_JOB_URL = env('FINISHED_JOB_URL')

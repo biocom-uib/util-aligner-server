@@ -398,7 +398,7 @@ class StringDB(object):
                         score_id = StringDB.EVIDENCE_SCORE_TYPES[score_type]
                         sql += f'\nor (evidence_scores[i][1] = {score_id} and evidence_scores[i][2] >= {threshold})'
                     else:
-                        print(f'StringDB.get_network: invalid score_id/threshold pair: {score_id} >= {threshold}')
+                        print(f'StringDB.get_network: invalid score_type/threshold pair: {score_type} >= {threshold}')
 
                 sql += ';'
 
