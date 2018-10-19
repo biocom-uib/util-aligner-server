@@ -49,6 +49,10 @@ async def compare_alignments(data):
 
         joined = pd.concat(alignments, join='outer', axis=1, sort=False)
 
+        # joined_alignments: outer join
+        # alignment: consens = ø
+        # scores: compute_scores(consens)
+
         result_id = await insert_comparison(job_id, joined)
 
     else:
