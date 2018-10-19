@@ -2,7 +2,7 @@ from collections import Counter
 from itertools import chain
 from math import inf, isinf
 
-from go_tools import get_curated_frequencies_path
+from go_tools import init_default_hrss
 import geneontology as godb
 import semantic_similarity as semsim
 
@@ -130,38 +130,8 @@ def compute_fc(net1, net2, alignment, ontology_mapping, dissim):
     return results, fc_avg
 
 
-def jaccard_dissim(gos1, gos2):
-    if gos1 and gos2:
-        len_intersection = len(gos1.intersection(gos2))
-        len_union = len(gos1.union(gos2))
-        return len_intersection / len_union
-    else:
-        return None
-
-def init_hrss_sim(agg = semsim.agg_bma_max):
-    import geneontology as godb
-
-    go_onto = godb.load_go_obo()
-    go_is_a_g = godb.onto_rel_graph(go_onto)
-
-    ic = semsim.init_ic(get_curated_frequencies_path())
-
-    def pair_dissim(go1, go2):
-        return semsim.get_hrss_sim(go_is_a_g, ic, go1, go2)
-
-    def agg_dissim(gos1, gos2):
-        return agg(pair_dissim, gos1, gos2)
-
-    def dissim(gos1, gos2):
-        if gos1 and gos2:
-            r = min(semsim.namespace_wise_comparisons(go_onto, agg_dissim, gos1, gos2), default=inf)
-            return r if not isinf(r) else None
-        else:
-            return None
-
-    return dissim
-
-hrss_bma_sim = init_hrss_sim(agg = semsim.agg_bma_max)
+jaccard_dissim = semsim.JaccardSim().compare
+hrss_bma_sim = init_default_hrss().compare
 
 def compute_fc_scores(net1, net2, alignment, ontology_mapping):
     fc_values_jaccard, fc_jaccard = compute_fc(net1, net2, alignment, ontology_mapping, jaccard_dissim)
