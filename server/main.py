@@ -1,9 +1,10 @@
 from aiohttp import ClientSession
-from asyncio import get_event_loop
+from asyncio import gather, get_event_loop
 import logging
 from json import dumps as json_dumps
 from config import config
-from mongo import insert_result
+from mongo import retrieve_file, retrieve_result, insert_result, insert_comparison
+import pandas as pd
 from os import path
 from server_queue import app
 import time
@@ -16,7 +17,47 @@ from sources import IsobaseLocal, StringDB
 logger = logging.getLogger(__name__)
 
 
-@app.task(name='process_alignment', queue='server_default')
+@app.task(name='compare_alignments', queue='server_comparer')
+def compare_alignments_sync(data):
+    loop = get_event_loop()
+    return loop.run_until_complete(compare_alignments(data))
+
+async def compare_alignments(data):
+    logger.info(f'combining alignments {data}')
+
+    job_id = data['job_id']
+    result_ids = data['results_object_ids']
+
+    assert len(result_ids) > 0
+
+    records = await gather(*[retrieve_result(result_id) for result_id in result_ids])
+    records = [record for record in records if record['ok'] and alignment_tsv in record['files']]
+
+    db = records[0]['db']
+    net1_desc = records[0]['net1']
+    net2_desc = records[0]['net2']
+
+    if all(record['db'] == db and record['net1'] == net1_desc and record['net2'] == net2_desc for record in records):
+        aligners = [record['aligner'].lower() for record in records]
+        assert len(aligners) == len(set(aligners))
+
+        alignments = await gather(*[retrieve_file(record['files']['alignment_tsv']) for record in records])
+
+        alignments = [pd.read_csv(alignment, sep='\t', index_col=0)
+                        .rename(columns = lambda n: f"{n}_{record['aligner']}")
+                      for record, alignment in zip(records, alignments)]
+
+        joined = pd.concat(alignments, join='outer', axis=1, sort=False)
+
+        result_id = await insert_comparison(job_id, joined)
+
+    else:
+        result_id = await insert_comparison(job_id, joined)
+
+    await send_finished_comparison(job_id, result_id)
+
+
+@app.task(name='process_alignment', queue='server_aligner')
 def process_alignment_sync(data):
     loop = get_event_loop()
     return loop.run_until_complete(process_alignment(data))
@@ -149,14 +190,21 @@ async def process_alignment(data):
     logger.info(f'[{job_id}] finished with result {result_id}')
     logger.debug(f'[{job_id}] job result: {response_data}')
 
-    await send_finished_job(job_id, result_id)
+    await send_finished_alignment(job_id, result_id)
 
 
-async def send_finished_job(job_id, result_id):
+async def send_finished_alignment(job_id, result_id):
+    url = config['FINISHED_ALIGNMENT_URL']
+    return await send_finished_job(job_id, result_id, url)
+
+async def send_finished_comparison(job_id, result_id):
+    url = config['FINISHED_COMPARISON_URL']
+    return await send_finished_job(job_id, result_id, url)
+
+async def send_finished_job(job_id, result_id, url):
     headers = {'content-type': 'application/json'}
     data = {'job_id': job_id, 'result_id': str(result_id)}
 
-    url = config['FINISHED_JOB_URL']
     async with ClientSession(headers=headers) as session:
         async with session.post(url, data=json_dumps(data)) as response:
             response.raise_for_status()

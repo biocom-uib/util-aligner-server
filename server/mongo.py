@@ -1,3 +1,4 @@
+from bson.objectid import ObjectId
 import motor.motor_asyncio
 import ujson
 
@@ -5,6 +6,17 @@ client = motor.motor_asyncio.AsyncIOMotorClient('mongodb://util-aligner-server:u
 db = client.util_aligner
 
 gridfs = motor.motor_asyncio.AsyncIOMotorGridFSBucket(db)
+
+
+async def insert_comparison(job_id, joined_alignment):
+    pass
+
+async def retrieve_file(file_id):
+    f = await gridfs.open_download_stream(ObjectId(file_id))
+    return await f.read()
+
+async def retrieve_result(insert_id):
+    return await gridfs.results.find_one({'_id': ObjectId(insert_id)})
 
 
 async def insert_result(job_id, results, files=dict()):
