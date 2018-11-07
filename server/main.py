@@ -49,6 +49,12 @@ async def compare_alignments(data):
 
         joined = pd.concat(alignments, join='outer', axis=1, sort=False)
 
+        def all_equal(xs): return xs.empty or all(xs[0] == x for x in xs)
+
+        intersection = joined.loc[joined.agg(all_equal, axis=1)]
+
+        scores = compute_scores(intersection)
+
         # joined_alignments: outer join
         # alignment: consens = ø
         # scores: compute_scores(consens)

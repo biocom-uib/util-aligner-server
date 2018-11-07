@@ -1,6 +1,6 @@
 from collections import Counter
 from itertools import chain
-from math import inf, isinf
+from math import isnan
 
 from go_tools import init_default_hrss
 import geneontology as godb
@@ -121,7 +121,7 @@ def compute_fc(net1, net2, alignment, ontology_mapping, dissim):
 
         fc = dissim(gos1, gos2)
 
-        if fc is not None:
+        if not isnan(fc):
             results.append((p1_name, p2_name, fc))
             fc_sum += fc
             fc_len += 1
