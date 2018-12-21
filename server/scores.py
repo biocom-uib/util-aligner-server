@@ -17,7 +17,7 @@ def compute_ec_scores(net1, net2, alignment):
         'min_n_edges': min_es
     }
 
-    alignment = dict(alignment)
+    alignment_dict = alignment.iloc[:,0].to_dict()
 
     unaligned_edges_net1 = set()
     unaligned_nodes_net1 = set()
@@ -32,7 +32,7 @@ def compute_ec_scores(net1, net2, alignment):
         p1_id, p2_id = e.tuple
         p1_name, p2_name = net1.vs[p1_id]['name'], net1.vs[p2_id]['name']
 
-        fp1_name, fp2_name = alignment.get(p1_name), alignment.get(p2_name)
+        fp1_name, fp2_name = alignment_dict.get(p1_name), alignment_dict.get(p2_name)
         if fp1_name is None:
             unaligned_nodes_net1.add(p1_name)
             unaligned_edges_net1.add((p1_name, p2_name))
@@ -57,7 +57,7 @@ def compute_ec_scores(net1, net2, alignment):
             non_preserved_edges.add((p1_name, p2_name))
 
     def node_preimage(p_name):
-        selections = (net1.vs.select(name=preim_name) for preim_name, value in alignment.items() if value == p_name)
+        selections = (net1.vs.select(name=preim_name) for preim_name, value in alignment_dict.items() if value == p_name)
         return [v.index for v in chain.from_iterable(selections)]
 
     # compute non_reflected_edges
@@ -109,13 +109,13 @@ def count_annotations(net, ontology_mapping):
     return ann_freqs, no_go_prots
 
 
-def compute_fc(net1, net2, alignment, ontology_mapping, dissim):
+def compute_fc(alignment, ontology_mapping, dissim):
     fc_sum = 0
     fc_len = 0
 
     results = []
 
-    for p1_name, p2_name in alignment:
+    for p1_name, p2_name in alignment.itertuples(name=None):
         gos1 = frozenset(ontology_mapping.get(p1_name, []))
         gos2 = frozenset(ontology_mapping.get(p2_name, []))
 
@@ -134,9 +134,8 @@ jaccard_dissim = semsim.JaccardSim().compare
 hrss_bma_sim = init_default_hrss().compare
 
 def compute_fc_scores(net1, net2, alignment, ontology_mapping):
-    fc_values_jaccard, fc_jaccard = compute_fc(net1, net2, alignment, ontology_mapping, jaccard_dissim)
-
-    fc_values_hrss_bma, fc_hrss_bma = compute_fc(net1, net2, alignment, ontology_mapping, hrss_bma_sim)
+    fc_values_jaccard,  fc_jaccard  = compute_fc(alignment, ontology_mapping, jaccard_dissim)
+    fc_values_hrss_bma, fc_hrss_bma = compute_fc(alignment, ontology_mapping, hrss_bma_sim)
 
     ann_freqs_net1, no_go_prots_net1 = count_annotations(net1, ontology_mapping)
     ann_freqs_net2, no_go_prots_net2 = count_annotations(net2, ontology_mapping)
