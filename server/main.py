@@ -145,9 +145,6 @@ async def process_alignment(job_id, data):
 
     return response_data, result_files
 
-    # result_id = await insert_alignment(job_id, response_data, result_files)
-    # await send_finished_alignment(job_id, result_id)
-
 
 async def process_alignment_and_send(data):
     job_id = data['job_id']
@@ -278,10 +275,6 @@ async def compare_alignments(job_id, data):
             {'aligner': record['aligner'], 'aligner_params': record['aligner_params']}
             for record in records
         ]
-
-    # joined_alignments: outer join
-    # alignment: consens = ø
-    # scores: compute_scores(consens)
 
     return response_data, result_files
 
