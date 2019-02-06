@@ -1,0 +1,27 @@
+{
+    "alignet": {
+        "module": "server.aligners.alignet",
+        "class": "Alignet",
+        "name": "AligNet"
+    },
+    "hubalign": {
+        "module": "server.aligners.hubalign",
+        "class": "Hubalign",
+        "name": "HubAlign"
+    },
+    "l-graal": {
+        "module": "server.aligners.lgraal",
+        "class": "LGraal",
+        "name": "L-GRAAL"
+    },
+    "pinalog": {
+        "module": "server.aligners.pinalog",
+        "class": "Pinalog",
+        "name": "PINALOG"
+    },
+    "spinal": {
+        "module": "server.aligners.spinal",
+        "class": "Spinal",
+        "name": "SPINAL"
+    }
+}
