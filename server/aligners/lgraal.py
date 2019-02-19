@@ -1,5 +1,6 @@
 from os import path
 import os
+import subprocess
 
 from server.aligners.aligner import Aligner
 from server.util import iter_csv

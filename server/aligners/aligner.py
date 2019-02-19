@@ -103,10 +103,10 @@ class Aligner(object):
                 result['run_time'] = end_time - start_time
                 header, alignment = self.import_alignment(net1, net2, run_dir_path)
 
-                alignment_df = pd.DataFrame(alignment, columns=['net1','net2'])
-                alignment_df.set_index('net1', inplace=True)
-                alignment_df.rename_axis(header[0], inplace=True)
-                alignment_df.rename(columns={'net2': header[1]}, inplace=True)
+                columns = [f'net1_{header[0]}', f'net2_{header[1]}']
+
+                alignment_df = pd.DataFrame(alignment, columns=columns)
+                alignment_df.set_index(columns[0], inplace=True)
 
                 result['alignment'] = alignment_df
 
