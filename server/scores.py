@@ -1,8 +1,8 @@
 from collections import Counter
 from itertools import chain
-from math import isnan
+from math import inf, isinf
 
-from go_tools import init_default_hrss
+from go_tools import get_curated_frequencies_path
 import geneontology as godb
 import semantic_similarity as semsim
 
@@ -17,7 +17,7 @@ def compute_ec_scores(net1, net2, alignment):
         'min_n_edges': min_es
     }
 
-    alignment_dict = alignment.iloc[:,0].to_dict()
+    alignment = dict(alignment)
 
     unaligned_edges_net1 = set()
     unaligned_nodes_net1 = set()
@@ -32,7 +32,7 @@ def compute_ec_scores(net1, net2, alignment):
         p1_id, p2_id = e.tuple
         p1_name, p2_name = net1.vs[p1_id]['name'], net1.vs[p2_id]['name']
 
-        fp1_name, fp2_name = alignment_dict.get(p1_name), alignment_dict.get(p2_name)
+        fp1_name, fp2_name = alignment.get(p1_name), alignment.get(p2_name)
         if fp1_name is None:
             unaligned_nodes_net1.add(p1_name)
             unaligned_edges_net1.add((p1_name, p2_name))
@@ -57,7 +57,7 @@ def compute_ec_scores(net1, net2, alignment):
             non_preserved_edges.add((p1_name, p2_name))
 
     def node_preimage(p_name):
-        selections = (net1.vs.select(name=preim_name) for preim_name, value in alignment_dict.items() if value == p_name)
+        selections = (net1.vs.select(name=preim_name) for preim_name, value in alignment.items() if value == p_name)
         return [v.index for v in chain.from_iterable(selections)]
 
     # compute non_reflected_edges
@@ -109,19 +109,19 @@ def count_annotations(net, ontology_mapping):
     return ann_freqs, no_go_prots
 
 
-def compute_fc(alignment, ontology_mapping, dissim):
+def compute_fc(net1, net2, alignment, ontology_mapping, dissim):
     fc_sum = 0
     fc_len = 0
 
     results = []
 
-    for p1_name, p2_name in alignment.itertuples(name=None):
+    for p1_name, p2_name in alignment:
         gos1 = frozenset(ontology_mapping.get(p1_name, []))
         gos2 = frozenset(ontology_mapping.get(p2_name, []))
 
         fc = dissim(gos1, gos2)
 
-        if not isnan(fc):
+        if fc is not None:
             results.append((p1_name, p2_name, fc))
             fc_sum += fc
             fc_len += 1
@@ -130,12 +130,43 @@ def compute_fc(alignment, ontology_mapping, dissim):
     return results, fc_avg
 
 
-jaccard_dissim = semsim.JaccardSim().compare
-hrss_bma_sim = init_default_hrss().compare
+def jaccard_dissim(gos1, gos2):
+    if gos1 and gos2:
+        len_intersection = len(gos1.intersection(gos2))
+        len_union = len(gos1.union(gos2))
+        return len_intersection / len_union
+    else:
+        return None
+
+def init_hrss_sim(agg = semsim.agg_bma_max):
+    import geneontology as godb
+
+    go_onto = godb.load_go_obo()
+    go_is_a_g = godb.onto_rel_graph(go_onto)
+
+    ic = semsim.init_ic(get_curated_frequencies_path())
+
+    def pair_dissim(go1, go2):
+        return semsim.get_hrss_sim(go_is_a_g, ic, go1, go2)
+
+    def agg_dissim(gos1, gos2):
+        return agg(pair_dissim, gos1, gos2)
+
+    def dissim(gos1, gos2):
+        if gos1 and gos2:
+            r = min(semsim.namespace_wise_comparisons(go_onto, agg_dissim, gos1, gos2), default=inf)
+            return r if not isinf(r) else None
+        else:
+            return None
+
+    return dissim
+
+hrss_bma_sim = init_hrss_sim(agg = semsim.agg_bma_max)
 
 def compute_fc_scores(net1, net2, alignment, ontology_mapping):
-    fc_values_jaccard,  fc_jaccard  = compute_fc(alignment, ontology_mapping, jaccard_dissim)
-    fc_values_hrss_bma, fc_hrss_bma = compute_fc(alignment, ontology_mapping, hrss_bma_sim)
+    fc_values_jaccard, fc_jaccard = compute_fc(net1, net2, alignment, ontology_mapping, jaccard_dissim)
+
+    fc_values_hrss_bma, fc_hrss_bma = compute_fc(net1, net2, alignment, ontology_mapping, hrss_bma_sim)
 
     ann_freqs_net1, no_go_prots_net1 = count_annotations(net1, ontology_mapping)
     ann_freqs_net2, no_go_prots_net2 = count_annotations(net2, ontology_mapping)
