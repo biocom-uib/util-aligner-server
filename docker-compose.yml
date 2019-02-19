@@ -1,7 +1,7 @@
 version: '3'
 
 services:
-    server-aligner:
+    server:
       build:
         context: .
         dockerfile: ./docker/Dockerfile
@@ -15,7 +15,7 @@ services:
         - server_queue
         - worker
         - -Q
-        - server_aligner
+        - "${CELERY_TASK_DEFAULT_QUEUE}"
         - -l
         - info
         - -c
@@ -23,48 +23,13 @@ services:
       volumes:
         - .:/opt/:rw
       environment:
-        - CELERY_BROKER_URL=${CELERY_BROKER_URL}
-        - CELERY_TASK_DEFAULT_QUEUE=server_aligner
-        - CELERY_TASK_TIME_LIMIT=
-        - FINISHED_ALIGNMENT_URL=${FINISHED_ALIGNMENT_URL}
-        - FINISHED_COMPARISON_URL=${FINISHED_COMPARISON_URL}
+        - CELERY_BROKER_URL
+        - CELERY_TASK_DEFAULT_QUEUE
+        - CELERY_TASK_TIME_LIMIT
+        - FINISHED_JOB_URL
       networks:
         server-net:
           ipv4_address: 172.20.0.2
-          aliases: [server]
-        stringdb-net:
-        geneontology-net:
-
-    server-comparer:
-      build:
-        context: .
-        dockerfile: ./docker/Dockerfile
-      depends_on:
-        - rabbitmq
-        - mysql
-        - mongo
-      command:
-        - celery
-        - -A
-        - server_queue
-        - worker
-        - -Q
-        - server_comparer
-        - -l
-        - info
-        - -c
-        - "1"
-      volumes:
-        - .:/opt/:rw
-      environment:
-        - CELERY_BROKER_URL=${CELERY_BROKER_URL}
-        - CELERY_TASK_DEFAULT_QUEUE=server_comparer
-        - CELERY_TASK_TIME_LIMIT=
-        - FINISHED_ALIGNMENT_URL=${FINISHED_ALIGNMENT_URL}
-        - FINISHED_COMPARISON_URL=${FINISHED_COMPARISON_URL}
-      networks:
-        server-net:
-          ipv4_address: 172.20.0.3
           aliases: [server]
         stringdb-net:
         geneontology-net:
@@ -87,7 +52,7 @@ services:
         - MYSQL_DATABASE=protein_db
       networks:
         server-net:
-          ipv4_address: 172.20.0.4
+          ipv4_address: 172.20.0.3
           aliases: [mysql]
 
     rabbitmq:
@@ -100,7 +65,7 @@ services:
         - RABBITMQ_DEFAULT_PASS
       networks:
         server-net:
-          ipv4_address: 172.20.0.5
+          ipv4_address: 172.20.0.4
           aliases: [rabbitmq]
 
     mongo:
@@ -119,7 +84,7 @@ services:
         - ./mongo-initdb.d:/docker-entrypoint-initdb.d:ro
       networks:
         server-net:
-          ipv4_address: 172.20.0.6
+          ipv4_address: 172.20.0.5
           aliases: [mongo]
 
 volumes:

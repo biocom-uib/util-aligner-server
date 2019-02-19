@@ -209,20 +209,12 @@ class IsobaseLocal(object):
             raise ValueError(f'invalid species name: {species_name}')
 
     @coroutine
-    def __aenter__(self):
-        return self
-
-    @coroutine
-    def __aexit__(self, exc_type, exc, tb):
-        pass
-
-    @coroutine
     def get_network(self, species_name):
         self._check_valid_species(species_name)
         species_path = path.join(self.base_path, f'{species_name}.tab')
 
         if not path.isfile(species_path):
-            raise LookupError(f'network file for {species_name} was not found')
+            raise IOError(f'network file for {species_name} was not found')
 
         return read_net_tsv_edgelist(species_name, species_path)
 
@@ -234,13 +226,13 @@ class IsobaseLocal(object):
             matrix_path = path.join(self.base_path, f'{species1_name}-blast.tab')
 
             if not path.isfile(matrix_path):
-                raise LookupError(f'score matrix file for {species1_name} was not found')
+                raise IOError(f'score matrix file for {species1_name} was not found')
         else:
             self._check_valid_species(species2_name)
             matrix_path = path.join(self.base_path, f'{species1_name}-{species2_name}-blast.tab')
 
             if not path.isfile(matrix_path):
-                raise LookupError(f'score matrix file for {species1_name}-{species2_name} was not found')
+                raise IOError(f'score matrix file for {species1_name}-{species2_name} was not found')
 
         return read_tricol_bitscores(matrix_path, net1=net1, net2=net2)
 
@@ -288,16 +280,16 @@ class StringDB(object):
         if self.pool is None:
             self.conn = await aiopg.connect(host=self.host, port=self.port, user=self.user, password=self.password, dbname=self.dbname, timeout=None)
 
-    async def disconnect(self):
+    def disconnect(self):
         if self.conn is not None and not self.conn.closed:
-            await self.conn.close()
+            self.conn.close()
             self.conn = None
 
     async def __aenter__(self):
         await self.connect()
         return self
 
-    async def __aexit__(self, exc_type, exc, tb):
+    async def __aexit__(self):
         await self.disconnect()
 
     def _get_cursor(self):
@@ -467,7 +459,7 @@ class StringDB(object):
         if values:
             return StringDBBitscoreMatrix(np.array(values, dtype=array_dtype), net1=net1, net2=net2, by='string_id')
         else:
-            raise LookupError('bitscore matrix not available for the selected network pair')
+            return None
 
     async def get_ontology_mapping(self, networks):
         species_ids = [species for net in networks
