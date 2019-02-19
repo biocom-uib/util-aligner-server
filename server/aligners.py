@@ -4,6 +4,7 @@ import itertools
 import logging
 from os import path
 import os
+import pandas as pd
 import shutil
 import subprocess
 import tempfile
@@ -105,7 +106,14 @@ class Aligner(object):
                 result['exit_code'] = completed_process.returncode
 
                 result['run_time'] = end_time - start_time
-                result['alignment_header'], result['alignment'] = self.import_alignment(net1, net2, run_dir_path)
+                header, alignment = self.import_alignment(net1, net2, run_dir_path)
+
+                alignment_df = pd.DataFrame(alignment, columns=['net1','net2'])
+                alignment_df.set_index('net1', inplace=True)
+                alignment_df.rename_axis(header[0], inplace=True)
+                alignment_df.rename(columns={'net2': header[1]}, inplace=True)
+
+                result['alignment'] = alignment_df
 
             return result
 

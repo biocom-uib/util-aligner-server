@@ -4,9 +4,9 @@ util_aligner.createUser({
     user: "util-aligner-server",
     pwd: "util-aligner-server",
     roles: ["readWrite"],
-    authenticationRestrictions: [{
-        clientSource: ["172.20.0.2"]
-    }]
+    authenticationRestrictions: [
+        { clientSource: ["172.20.0.2/31"] },
+    ]
 });
 
 util_aligner.createUser({
@@ -22,7 +22,7 @@ admin.createUser({
     user: "root",
     pwd: "root",
     roles: ["root"],
-    authenticationRestrictions: [{
-        clientSource: ["127.0.0.1"]
-    }]
+    authenticationRestrictions: [
+        { clientSource: ["127.0.0.1"] },
+    ]
 });
