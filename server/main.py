@@ -39,7 +39,7 @@ def connect_to_db(db_name):
 
 async def db_get_network(db, net_desc):
     if isinstance(db, IsobaseLocal):
-        return await db.get_network(net1_desc)
+        return await db.get_network(net_desc)
 
     elif isinstance(db, StringDB):
         if net_desc['species_id'] >= 0:
@@ -83,6 +83,7 @@ async def process_alignment(job_id, data):
         async with connect_to_db(db_name.lower()) as db:
             logger.info(f'[{job_id}] fetching data')
 
+            print(data)
             net1 = await db_get_network(db, net1_desc)
             net2 = await db_get_network(db, net2_desc)
 
@@ -198,7 +199,8 @@ async def fetch_and_validate_previous_results(job_id, result_ids):
 
     aligners = [record['aligner'] for record in records]
 
-    # assert len(aligners) == len(set(aligners))
+    if len(aligners) != len(set(aligners)):
+        raise ValueError(f'[{job_id}] repeated aligners: ' + str(aligners))
 
     alignments = await gather(*[retrieve_file(record['files']['alignment_tsv']) for record in records])
     alignments = [StringIO(alignment.decode('utf-8')) for alignment in alignments]
@@ -212,12 +214,7 @@ async def fetch_and_validate_previous_results(job_id, result_ids):
     for aligner, alignment in zip(aligners, alignments):
         alignment.rename(inplace=True, columns=lambda col: f'{col}_{aligner}')
 
-    class NoSuffix:
-        def __str__(self): return ''
-    no_suffix = NoSuffix()
-
-    #joined = pd.concat(alignments, join='outer', axis=1, sort=False)
-    joined = reduce(lambda a1, a2: a1.join(a2, how='outer', lsuffix=no_suffix, rsuffix=no_suffix), alignments)
+    joined = alignments[0].join(alignments[1:], how='outer')
 
     return db_names[0], net1_descs[0], net2_descs[0], records, alignment_headers[0], joined
 
