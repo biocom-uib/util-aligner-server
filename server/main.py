@@ -15,17 +15,12 @@ from server_queue import app
 from scores import compute_scores, split_score_data_as_tsvs
 from sources import IsobaseLocal, StringDB
 from util import all_equal, write_tsv_to_string
+from aligners import load_aligner_classes
 
 logger = logging.getLogger(__name__)
 
 
-ALIGNERS_DISPATCHER = {
-    'alignet':  aligners.Alignet,
-    'hubalign': aligners.Hubalign,
-    'l-graal':  aligners.LGraal,
-    'pinalog':  aligners.Pinalog,
-    'spinal':   aligners.Spinal,
-}
+ALIGNERS_DISPATCHER = load_aligner_classes('aligners.json')
 
 
 def connect_to_db(db_name):
