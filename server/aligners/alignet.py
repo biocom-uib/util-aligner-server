@@ -15,9 +15,6 @@ class Alignet(Aligner):
 
     @property
     def env(self):
-        #r_lib_dir = path.join(path.expanduser('~'), 'r-library')
-        #os.makedirs(r_lib_dir)
-        #{'R_LIBS': r_lib_dir}
         return {'ALIGNET_NUM_THREADS': str(self.threads)}
 
     @property

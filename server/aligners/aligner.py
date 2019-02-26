@@ -54,7 +54,7 @@ class Aligner(object):
     def run(self, net1, net2, *args, run_dir_base_path='run', template_dir_base_path='template', max_trials=50):
         os.makedirs(run_dir_base_path, exist_ok=True)
 
-        # run_dir_path =  tempfile.mkdtemp(dir=run_dir_base_path, prefix=self.name + '-'):
+        # run_dir_path = tempfile.mkdtemp(dir=run_dir_base_path, prefix=self.name + '-')
 
         with tempfile.TemporaryDirectory(dir=run_dir_base_path, prefix=self.name + '-') as run_dir_path:
             self.logger.info(f'run_{self.name} @ {run_dir_path}: setting up required files')

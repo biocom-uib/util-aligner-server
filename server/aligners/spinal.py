@@ -38,10 +38,6 @@ class Spinal(Aligner):
         blast_path = path.join(run_dir_path, 'blast-net1-net2.csv')
         blast_net1_net2.write_tricol(blast_path, by='index', delimiter=' ')
 
-    # def import_alignment_names(self, execution_dir, file_name='alignment-net1-net2-names.tab'):
-    #     align_path = path.join(execution_dir, file_name)
-    #     return [(a, b) for a, b in iter_csv(align_path, delimiter='\t')]
-
     def iter_alignment_ids(self, execution_dir, file_name='alignment-net1-net2.csv'):
         alignment_path = path.join(execution_dir, file_name)
 
@@ -53,8 +49,8 @@ class Spinal(Aligner):
             yield int(p1id), int(p2id)
 
     def iter_alignment(self, net1, net2, execution_dir, file_name='alignment-net1-net2.csv'):
-        net1_vs = net1.igraph.vs # sources.read_net_gml(net1.name, path.join(execution_dir, 'net1.gml')).igraph.vs
-        net2_vs = net2.igraph.vs # sources.read_net_gml(net2.name, path.join(execution_dir, 'net2.gml')).igraph.vs
+        net1_vs = net1.igraph.vs
+        net2_vs = net2.igraph.vs
 
         for p1id, p2id in self.iter_alignment_ids(execution_dir, file_name):
             yield net1_vs[p1id]['name'], net2_vs[p2id]['name']
