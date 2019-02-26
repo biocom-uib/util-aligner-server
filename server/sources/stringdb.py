@@ -1,89 +1,16 @@
-#!/usr/bin/python3
-from asyncio import coroutine
-import igraph
-import io
-import json
-import numpy as np
 import aiopg
-from os import path
+import igraph
+import numpy as np
 
-import util
+from server.sources.network import Network
+from server.sources.bitscore import TricolBitscoreMatrix
 
-
-class Network(object):
-    def __init__(self, name):
-        self.name = name
-        self._igraph = None
-
-    def already_has_igraph(self):
-        return self._igraph is not None
-
-    @property
-    def igraph(self):
-        if self._igraph is None:
-            self._igraph = self.to_igraph()
-        return self._igraph
-
-    def iter_edges(self):
-        vs = self.igraph.vs
-
-        for e in self.igraph.es:
-            yield vs[e.source]['name'], vs[e.target]['name']
-
-    def iter_vertices(self, by='name'):
-        if by == 'object':
-            yield from self.igraph.vs
-        elif by == 'index':
-            yield from range(len(self.igraph.vs))
-        else:
-            for v in self.igraph.vs:
-                yield v[by]
-
-    def write_tsv_edgelist(self, file_path, edgelist=None, delimiter='\t', header=None):
-        if edgelist is None:
-            edgelist = self.iter_edges()
-
-        with util.open_csv_write(file_path, delimiter=delimiter) as writer:
-            if header is not None:
-                writer.writerow(header)
-            for edge in edgelist:
-                writer.writerow(edge)
-
-    def write_gml(self, file_path):
-        for v in self.igraph.vs:
-            v['id'] = v.index
-
-        self.igraph.write_gml(file_path)
-
-    def write_leda(self, file_path, names, weights=None):
-        self.igraph.write_leda(file_path, names=names, weights=weights)
-
-class EdgeListNetwork(Network):
-    def __init__(self, name, edgelist):
-        super().__init__(name)
-        self.edgelist = edgelist
-
-    def to_igraph(self):
-        return igraph.Graph.TupleList(self.iter_edges())
-
-    def iter_edges(self):
-        return self.edgelist if not self.already_has_igraph() else super().iter_edges()
-
-class IgraphNetwork(Network):
-    def __init__(self, name, graph, simplify=True):
-        super().__init__(name)
-        self.graph = graph
-        if simplify:
-            self.graph.simplify()
-
-    def to_igraph(self):
-        return self.graph
 
 class StringDBNetwork(Network):
-    def __init__(self, species_id, protein_names, edges):
+    def __init__(self, species_id, external_ids, edges):
         super().__init__(f'stringdb_{species_id}')
         self.species_id = species_id
-        self.protein_names = protein_names
+        self.external_ids = external_ids
         self._protein_set = None
         self.edges = edges
 
@@ -98,13 +25,13 @@ class StringDBNetwork(Network):
         if not graph.is_simple():
             graph.simplify()
 
-        prots = self.protein_names
+        ext_ids = self.external_ids
         for v in graph.vs:
             string_id = v['name'] # better have unique names
             # igraph has some bugs regarding non-str names (https://github.com/igraph/python-igraph/issues/73#issuecomment-203077381)
             v['name'] = f'v{string_id}'
             v['string_id'] = string_id
-            v['prot_name'] = prots[string_id] # not necessarily unique, e.g. NGR_c13120
+            v['external_id'] = ext_ids[string_id] # not necessarily unique, e.g. NGR_c13120
 
         return graph
 
@@ -121,62 +48,6 @@ class StringDBNetwork(Network):
     def iter_edges(self):
         return self.edges if not self.already_has_igraph() else super().iter_edges()
 
-def read_net_gml(name, net_path):
-    return IgraphNetwork(name, igraph.Graph.Read_GML(net_path))
-
-def read_net_tsv_edgelist(name, net_path=None, string=None, simplify=True):
-    if string is not None:
-        return EdgeListNetwork(name, list(util.iter_csv_fd(io.StringIO(string), delimiter='\t')))
-    elif net_path is not None:
-        return EdgeListNetwork(name, list(util.iter_csv(net_path, delimiter='\t')))
-    else:
-        return None
-
-
-class BitscoreMatrix(object):
-    def __init__(self):
-        pass
-
-    def write_tricol(self, file_path, by='name', **kwargs):
-        if 'delimiter' not in kwargs:
-            kwargs['delimiter'] = '\t'
-        util.write_csv(file_path, self.iter_tricol(by=by), **kwargs)
-
-class TricolBitscoreMatrix(BitscoreMatrix):
-    def __init__(self, tricol, net1=None, net2=None, by='name'):
-        self.tricol = np.array(tricol)
-        self.net1 = net1
-        self.net2 = net2
-        self.by = by
-
-    def iter_tricol(self, by='name'):
-        self_by = self.by
-
-        if by == self_by:
-            yield from self.tricol
-
-        elif by == 'object':
-            if self.net1 is None or self.net2 is None:
-                raise ValueError(f"must specify net1 and net2 in order to use different 'by' values (current: {self.by}, given: {by})")
-
-            net1_vs = self.net1.igraph.vs
-            net2_vs = self.net2.igraph.vs
-
-            if self_by == 'index':
-                for p1_id, p2_id, score in self.tricol:
-                    yield net1_vs[p1_id], net2_vs[p2_id], score
-            else:
-                for p1_by, p2_by, score in self.tricol:
-                    p1s = net1_vs.select(**{self_by:p1_by})
-                    p2s = net2_vs.select(**{self_by:p2_by})
-                    if len(p1s) > 0 and len(p2s) > 0:
-                        yield p1s[0], p2s[0], score
-        elif by == 'index':
-            for p1, p2, score in self.iter_tricol(by='object'):
-                yield p1.index, p2.index, score
-        else:
-            for p1, p2, score in self.iter_tricol(by='object'):
-                yield p1[by], p2[by], score
 
 class StringDBBitscoreMatrix(TricolBitscoreMatrix):
     def __init__(self, tricol, net1=None, net2=None, by='string_id'):
@@ -190,64 +61,6 @@ class StringDBBitscoreMatrix(TricolBitscoreMatrix):
         else:
             yield from super().iter_tricol(by=by)
 
-
-def read_tricol_bitscores(file_path, net1=None, net2=None, by='name', **kwargs):
-    if 'delimiter' not in kwargs:
-        kwargs['delimiter'] = '\t'
-    return TricolBitscoreMatrix(list(util.iter_csv(file_path, **kwargs)), net1=net1, net2=net2, by=by)
-
-def identity_bitscores(net, by='name'):
-    return TricolBitscoreMatrix([(v, v, 1) for v in net.iter_vertices(by=by)], by=by)
-
-
-class IsobaseLocal(object):
-    def __init__(self, base_path):
-        self.base_path = base_path
-
-    def _check_valid_species(self, species_name):
-        if not species_name.isalnum():
-            raise ValueError(f'invalid species name: {species_name}')
-
-    @coroutine
-    def __aenter__(self):
-        return self
-
-    @coroutine
-    def __aexit__(self, exc_type, exc, tb):
-        pass
-
-    @coroutine
-    def get_network(self, species_name):
-        self._check_valid_species(species_name)
-        species_path = path.join(self.base_path, f'{species_name}.tab')
-
-        if not path.isfile(species_path):
-            raise LookupError(f'network file for {species_name} was not found')
-
-        return read_net_tsv_edgelist(species_name, species_path)
-
-    @coroutine
-    def get_bitscore_matrix(self, species1_name, species2_name=None, net1=None, net2=None):
-        self._check_valid_species(species1_name)
-
-        if species2_name is None:
-            matrix_path = path.join(self.base_path, f'{species1_name}-blast.tab')
-
-            if not path.isfile(matrix_path):
-                raise LookupError(f'score matrix file for {species1_name} was not found')
-        else:
-            self._check_valid_species(species2_name)
-            matrix_path = path.join(self.base_path, f'{species1_name}-{species2_name}-blast.tab')
-
-            if not path.isfile(matrix_path):
-                raise LookupError(f'score matrix file for {species1_name}-{species2_name} was not found')
-
-        return read_tricol_bitscores(matrix_path, net1=net1, net2=net2)
-
-    @coroutine
-    def get_ontology_mapping(self, networks=None):
-        with open(path.join(self.base_path, 'go.json'), 'r') as go_f:
-            return json.load(go_f)
 
 class StringDB(object):
     EVIDENCE_SCORE_TYPES = {
@@ -375,9 +188,9 @@ class StringDB(object):
 
         return dict(rows)
 
-    async def get_network(self, species_id, score_thresholds={}, protein_names=None):
-        if protein_names is None:
-            protein_names = await self.get_protein_names(species_id)
+    async def get_network(self, species_id, score_thresholds={}, external_ids=None):
+        if external_ids is None:
+            external_ids = await self.get_protein_external_ids(species_id)
 
         async with self._get_cursor() as cursor:
             if score_thresholds:
@@ -425,14 +238,14 @@ class StringDB(object):
 
             edges = await cursor.fetchall()
 
-        return StringDBNetwork(species_id, protein_names, np.array(edges))
+        return StringDBNetwork(species_id, external_ids, np.array(edges))
 
     async def build_custom_network(self, edges):
         string_ids = {p for e in edges for p in e}
         missing = await self._check_string_ids(string_ids)
 
         if not missing:
-            return StringDBNetwork(-1, await self.get_protein_names(string_ids=string_ids), np.array(edges))
+            return StringDBNetwork(-1, await self.get_protein_external_ids(string_ids=string_ids), np.array(edges))
         else:
             raise ValueError(f"Invalid string_id's: {set(missing)}")
 
