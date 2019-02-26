@@ -15,11 +15,17 @@ def all_equal(xs):
     except StopIteration:
         return True
 
-def iter_csv_fd(f, **kwargs):
+def iter_csv_fd(f, header=False, **kwargs):
     if 'skipinitialspace' not in kwargs and kwargs.get('delimiter',' ') == ' ':
         kwargs['skipinitialspace'] = True
 
-    yield from csv.reader(f, **kwargs)
+    reader = csv.reader(f, **kwargs)
+
+    if header:
+        next(reader)
+
+    yield from reader
+
 
 def iter_csv(file_path, **kwargs):
     with open(file_path, 'r') as f:

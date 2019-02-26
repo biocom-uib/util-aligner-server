@@ -13,7 +13,9 @@ from config import config
 from mongo import retrieve_file, retrieve_alignment_result, insert_alignment, insert_comparison
 from server_queue import app
 from scores import compute_scores, split_score_data_as_tsvs
-from sources import IsobaseLocal, StringDB
+from sources.isobaselocal import IsobaseLocal
+from sources.stringdb import StringDB
+from sources.stringdbviruslocal import StringDBVirusLocal
 from util import all_equal, write_tsv_to_string
 from aligners import load_aligner_classes
 
@@ -28,6 +30,8 @@ def connect_to_db(db_name):
         return IsobaseLocal('/opt/local-db/isobase')
     elif db_name == 'stringdb':
         return StringDB()
+    elif db_name == 'stringdbvirus':
+        return StringDBVirusLocal('/opt/local-db/stringdb-virus')
     else:
         raise ValueError(f'database not supported: {db_name}')
 
@@ -42,18 +46,18 @@ async def db_get_network(db, net_desc):
         else:
             return await db.build_custom_network(net_desc['edges'])
 
+    elif isinstance(db, StringDBVirusLocal):
+        return await db.get_network(net_desc['host_id'], net_desc['virus_id'])
 
 def networks_summary(db_name, net1_desc, net1, net2_desc, net2):
     return {
         'db': db_name,
 
         'net1': net1_desc,
-        'n_vert1': net1.igraph.vcount() if net1 is not None else -1,
-        'n_edges1': net1.igraph.ecount() if net1 is not None else -1,
+        'net1_details': net1.get_details() if net1 is not None else {},
 
         'net2': net2_desc,
-        'n_vert2': net2.igraph.vcount() if net2 is not None else -1,
-        'n_edges2': net2.igraph.ecount() if net2 is not None else -1,
+        'net2_details': net2.get_details() if net2 is not None else {},
     }
 
 
