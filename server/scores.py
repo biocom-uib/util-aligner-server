@@ -8,6 +8,7 @@ import geneontology as godb
 import semantic_similarity as semsim
 
 from server.util import write_tsv_to_string
+from server.sources.network import VirusHostNetwork
 
 
 def map_column_alignment(df, alignment_series, column):
