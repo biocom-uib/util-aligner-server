@@ -22,7 +22,7 @@ def iter_csv_fd(f, header=False, **kwargs):
     reader = csv.reader(f, **kwargs)
 
     if header:
-        for _ in reader: break
+        next(reader)
 
     yield from reader
 
