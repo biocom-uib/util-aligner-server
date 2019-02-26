@@ -49,4 +49,5 @@ class IsobaseLocal(object):
 
     @coroutine
     def get_ontology_mapping(self, networks=None):
+        # TODO: Update go.json to a newer go.obo and return its contents here
         return {}

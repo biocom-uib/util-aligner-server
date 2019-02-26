@@ -78,4 +78,5 @@ class StringDBVirusLocal(object):
 
     @coroutine
     def get_ontology_mapping(self, networks=None):
+        # TODO: Still unclear which annotations should we use for viruses
         return {}
