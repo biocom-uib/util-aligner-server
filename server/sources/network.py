@@ -108,3 +108,45 @@ class IgraphNetwork(Network):
 def read_net_gml(name, net_path):
     return IgraphNetwork(name, igraph.Graph.Read_GML(net_path))
 
+
+class VirusHostNetwork(object):
+    def __init__(self, host_name, virus_name):
+        self._host_name = host_name
+        self._virus_name = virus_name
+
+        self._host_net = None
+        self._virus_net = None
+        self._vh_bipartite_net = None
+
+    def is_virus_vertex(self, vid):
+        raise NotImplementedError()
+
+    def is_host_vertex(self, vid):
+        raise NotImplementedError()
+
+    def is_vh_interaction_edge(self, e):
+        vs = self.igraph.vs
+        src, tgt = e.tuple
+        return self.is_virus_vertex(vs[src]) != self.is_virus_vertex(vs[tgt])
+
+
+    @property
+    def host_net(self):
+        if self._host_net is None:
+            self._host_net = IgraphNetwork(self._host_name, self.igraph.vs.select(self.is_host_vertex).subgraph())
+        return self._host_net
+
+    @property
+    def virus_net(self):
+        if self._virus_net is None:
+            self._virus_net = IgraphNetwork(self._virus_name, self.igraph.vs.select(self.is_virus_vertex).subgraph())
+        return self._virus_net
+
+    @property
+    def vh_bipartite_net(self):
+        if self._vh_bipartite_net is None:
+            self._vh_bipartite_net = IgraphNetwork(
+                    f'{self._host_name}-{self._virus_name}',
+                    self.igraph.es.select(self.is_vh_interaction_edge).subgraph())
+
+        return self._vh_bipartite_net

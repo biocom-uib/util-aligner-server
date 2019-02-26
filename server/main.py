@@ -15,6 +15,7 @@ from server_queue import app
 from scores import compute_scores, split_score_data_as_tsvs
 from sources.isobaselocal import IsobaseLocal
 from sources.stringdb import StringDB
+from sources.stringdbviruslocal import StringDBVirusLocal
 from util import all_equal, write_tsv_to_string
 from aligners import load_aligner_classes
 
@@ -29,6 +30,8 @@ def connect_to_db(db_name):
         return IsobaseLocal('/opt/local-db/isobase')
     elif db_name == 'stringdb':
         return StringDB()
+    elif db_name == 'stringdbvirus':
+        return StringDBVirusLocal('/opt/local-db/stringdb-virus')
     else:
         raise ValueError(f'database not supported: {db_name}')
 
@@ -43,6 +46,8 @@ async def db_get_network(db, net_desc):
         else:
             return await db.build_custom_network(net_desc['edges'])
 
+    elif isinstance(db, StringDBVirusLocal):
+        return await db.get_network(net_desc['host_id'], net_desc['virus_id'])
 
 def networks_summary(db_name, net1_desc, net1, net2_desc, net2):
     return {
