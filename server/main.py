@@ -61,8 +61,8 @@ def networks_summary(db_name, net1_desc, net1, net2_desc, net2):
     }
 
 
-def alignment_summary(net1, net2, alignment, ontology_mapping, files):
-    scores = compute_scores(net1, net2, alignment, ontology_mapping)
+def alignment_summary(net1, net2, alignment, bitscore_matrix, ontology_mapping, files):
+    scores = compute_scores(net1, net2, alignment, bitscore_matrix, ontology_mapping)
     files.update(split_score_data_as_tsvs(scores))
 
     return scores
@@ -138,7 +138,7 @@ async def process_alignment(job_id, data):
         logger.info(f'[{job_id}] computing scores')
 
         try:
-            response_data['scores'] = alignment_summary(net1, net2, alignment, ontology_mapping, result_files)
+            response_data['scores'] = alignment_summary(net1, net2, alignment, net1_net2_scores, ontology_mapping, result_files)
         except:
             logger.exception(f'[{job_id}] exception was raised while computing scores')
 
@@ -236,6 +236,7 @@ async def compare_alignments(job_id, data):
         async with connect_to_db(db_name) as db:
             net1 = await db_get_network(db, net1_desc)
             net2 = await db_get_network(db, net2_desc)
+            bitscore_matrix = await db.get_bitscore_matrix(net1, net2)
             ontology_mapping = await db.get_ontology_mapping([net1, net2])
 
     except Exception as e:
@@ -262,7 +263,7 @@ async def compare_alignments(job_id, data):
         logger.info(f'[{job_id}] computing scores')
 
         try:
-            response_data['consensus_scores'] = alignment_summary(net1, net2, consensus, ontology_mapping, result_files)
+            response_data['consensus_scores'] = alignment_summary(net1, net2, consensus, bitscore_matrix, ontology_mapping, result_files)
         except:
             logger.exception(f'[{job_id}] exception was raised while computing scores')
 
