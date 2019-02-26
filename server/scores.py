@@ -6,7 +6,7 @@ from go_tools import init_default_hrss
 import geneontology as godb
 import semantic_similarity as semsim
 
-from util import write_tsv_to_string
+from server.util import write_tsv_to_string
 
 def compute_ec_scores(net1, net2, alignment):
     net1 = net1.igraph
