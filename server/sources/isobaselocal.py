@@ -49,6 +49,4 @@ class IsobaseLocal(object):
 
     @coroutine
     def get_ontology_mapping(self, networks=None):
-        with open(path.join(self.base_path, 'go.json'), 'r') as go_f:
-            return json.load(go_f)
-
+        return {}
