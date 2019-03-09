@@ -1,7 +1,7 @@
 import aiopg
 import igraph
 import numpy as np
-
+from networkx import Graph
 from server.sources.network import Network
 from server.sources.bitscore import TricolBitscoreMatrix
 
@@ -34,6 +34,12 @@ class StringDBNetwork(Network):
             v['external_id'] = ext_ids[string_id] # not necessarily unique, e.g. NGR_c13120
 
         return graph
+
+    def to_networkx(self):
+        G = Graph()
+        G.add_nodes_from(self.external_ids)
+        G.add_edges_from(self.edges)
+        return G
 
     async def get_species(self, db):
         if not self._species:
@@ -188,7 +194,8 @@ class StringDB(object):
 
         return dict(rows)
 
-    async def get_network(self, species_id, score_thresholds={}, external_ids=None):
+    async def get_network(self, species_id, score_thresholds={},
+                          external_ids=None):
         if external_ids is None:
             external_ids = await self.get_protein_external_ids(species_id)
 
@@ -231,8 +238,7 @@ class StringDB(object):
                       network.node_node_links
                     where
                       node_type_b = %(species_id)s;
-                    """;
-
+                    """
 
             await cursor.execute(sql, {'species_id': species_id})
 
@@ -335,3 +341,31 @@ class StringDB(object):
                 rows = await cursor.fetchall()
 
             return rows if rows else None
+
+    async def ensure_table_exists(self, score):
+        thresholds = ','.join(f"{threshold} INTEGER"
+                              for threshold in self.EVIDENCE_SCORE_TYPES)
+        sql = f""" CREATE TABLE IF NOT EXISTS {score}_table
+        (
+            external_id TEXT not null,
+            specie_id  INTEGER not null,
+            {thresholds},
+            value NUMBER not null
+        )"""
+        async with self._get_cursor() as cursor:
+            await cursor.execute(sql)
+
+    async def write_analysis_score(self, specie,  score, score_dict,
+                                   score_threshold):
+        await self.ensure_table_exists(score)
+        score_threshold_values = ','.join(score_threshold.values())
+        values = ','.join(f'({p}, {specie}, {score_threshold_values}, {value})'
+                          for p, value in score_dict)
+        score_threshold_keys = ','.join(score_threshold)
+        sql = f"""
+        INSERT INTO {score}_table
+        (external_id, specie_id, {score_threshold_keys}, value) VALUES
+        {values};
+        """
+        async with self._get_cursor() as cursor:
+            await cursor.execute(sql)
