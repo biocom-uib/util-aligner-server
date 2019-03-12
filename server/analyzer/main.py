@@ -1,21 +1,21 @@
 from asyncio import get_event_loop, gather
 from server.analyzer.interactor import compute_and_write_score
 from server.analyzer.scores import SCORES
-from sources.stringdb import StringDB
+from server.sources.stringdb import StringDB
 
 
-async def main(specie, score_threshold):
-    db = StringDB()
-    net = await db.get_network(specie, score_threshold).to_networkx()
-    tasks = [compute_and_write_score(db, net, score, score_threshold)
-             for score in SCORES]
-    gather(*tasks)
+async def main(species, score_threshold):
+    async with StringDB() as db:
+        net = await db.get_network(species, score_threshold)
+        net_nx = net.to_networkx()
+
+        tasks = [compute_and_write_score(db, net_nx, species, score, score_threshold)
+                 for score in SCORES]
+        gather(*tasks)
 
 
 if __name__ == '__main__':
     loop = get_event_loop()
-    specie = 6239
-    score_threshold = {score: 0 for score in StringDB.EVIDENCE_SCORE_TYPES}
+    species = 6239
     for i in range(11):
-        score_threshold['database_score'] = i*100
-        loop.run_until_complete(main(specie, score_threshold))
+        loop.run_until_complete(main(species, {'database_score': i*100}))

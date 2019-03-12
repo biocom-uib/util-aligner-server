@@ -343,6 +343,8 @@ class StringDB(object):
             return rows if rows else None
 
     async def ensure_table_exists(self, score):
+        # TODO: put in schema (features?) and check syntax for postgres
+
         thresholds = ','.join(f"{threshold} INTEGER"
                               for threshold in self.EVIDENCE_SCORE_TYPES)
         sql = f""" CREATE TABLE IF NOT EXISTS {score}_table
@@ -357,7 +359,7 @@ class StringDB(object):
 
     async def write_analysis_score(self, specie,  score, score_dict,
                                    score_threshold):
-        await self.ensure_table_exists(score)
+        # await self.ensure_table_exists(score)
         score_threshold_values = ','.join(score_threshold.values())
         values = ','.join(f'({p}, {specie}, {score_threshold_values}, {value})'
                           for p, value in score_dict)

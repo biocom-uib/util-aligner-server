@@ -13,8 +13,11 @@ def score(name):
     return decorator
 
 
-def compute_score(score, net):
-    return score_factory(score)(net)
+def compute_score(score, net, species):
+    print('computing', score, 'for', species)
+    r = score_factory(score)(net)
+    print('done computing', score, 'for', species)
+    return r
 
 
 def score_factory(score):
