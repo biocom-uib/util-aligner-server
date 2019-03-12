@@ -11,27 +11,31 @@ class StringDBNetwork(Network):
         super().__init__(f'stringdb_{species_id}')
         self.species_id = species_id
         self.external_ids = external_ids
-        self._protein_set = None
         self.edges = edges
 
         if species_id >= 0:
             self._species = [species_id]
         else:
             self._species = []
-        self._protein_set
 
     def to_igraph(self):
-        graph = igraph.Graph.TupleList(self.iter_edges())
-        if not graph.is_simple():
-            graph.simplify()
+        # NOTE: igraph has some bugs regarding non-str names
+        # (https://github.com/igraph/python-igraph/issues/73#issuecomment-203077381)
 
         ext_ids = self.external_ids
+
+        graph = igraph.Graph.TupleList(self.edges)
+
         for v in graph.vs:
-            string_id = v['name'] # better have unique names
-            # igraph has some bugs regarding non-str names (https://github.com/igraph/python-igraph/issues/73#issuecomment-203077381)
-            v['name'] = f'v{string_id}'
+            string_id = int(v['name']) # better have unique names
+            ext_id = ext_ids[string_id]
+
+            v['name'] = ext_id
             v['string_id'] = string_id
-            v['external_id'] = ext_ids[string_id] # not necessarily unique, e.g. NGR_c13120
+            v['external_id'] = ext_id
+
+        if not graph.is_simple():
+            graph.simplify()
 
         return graph
 
@@ -45,19 +49,19 @@ class StringDBNetwork(Network):
     def string_ids(self):
         return {int(v) for v in self.iter_vertices(by='string_id')}
 
-    def iter_edges(self):
-        return self.edges if not self.already_has_igraph() else super().iter_edges()
-
 
 class StringDBBitscoreMatrix(TricolBitscoreMatrix):
-    def __init__(self, tricol, net1=None, net2=None, by='string_id'):
+    def __init__(self, tricol, net1, net2, by='string_id'):
         super().__init__(tricol, net1, net2, by)
 
     def iter_tricol(self, by='name'):
         # just an optimization
         if by == 'name':
+            ext_ids1 = net1.external_ids
+            ext_ids2 = net2.external_ids
+
             for p1, p2, score in super().iter_tricol(by='string_id'):
-                yield f'v{p1}', f'v{p2}', score
+                yield ext_ids1[p1], ext_ids2[p2], score
         else:
             yield from super().iter_tricol(by=by)
 
@@ -168,6 +172,19 @@ class StringDB(object):
                     where species_id = %(species_id)s;
                     """,
                     {'species_id': species_id})
+
+            rows = await cursor.fetchall()
+
+        return dict(rows)
+
+    async def get_protein_external_ids(self, species_id):
+        async with self._get_cursor() as cursor:
+            await cursor.execute("""
+                select protein_id, protein_external_id
+                from items.proteins
+                where species_id = %(species_id)s;
+                """,
+                {'species_id': species_id})
 
             rows = await cursor.fetchall()
 
