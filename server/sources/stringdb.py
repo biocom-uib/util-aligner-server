@@ -343,29 +343,19 @@ class StringDB(object):
             return rows if rows else None
 
     async def ensure_table_exists(self, score):
-        # TODO: put in schema (features?) and check syntax for postgres
-
-        thresholds = ','.join(f"{threshold} INTEGER"
-                              for threshold in self.EVIDENCE_SCORE_TYPES)
-        sql = f""" CREATE TABLE IF NOT EXISTS {score}_table
-        (
-            external_id TEXT not null,
-            specie_id  INTEGER not null,
-            {thresholds},
-            value NUMBER not null
-        )"""
+        sql = f" CREATE TABLE IF NOT EXISTS features.{score}_table  INHERITS features.base_table"
         async with self._get_cursor() as cursor:
             await cursor.execute(sql)
 
     async def write_analysis_score(self, specie,  score, score_dict,
                                    score_threshold):
-        # await self.ensure_table_exists(score)
+        await self.ensure_table_exists(score)
         score_threshold_values = ','.join(score_threshold.values())
         values = ','.join(f'({p}, {specie}, {score_threshold_values}, {value})'
                           for p, value in score_dict)
         score_threshold_keys = ','.join(score_threshold)
         sql = f"""
-        INSERT INTO {score}_table
+        INSERT INTO features.{score}_table
         (external_id, specie_id, {score_threshold_keys}, value) VALUES
         {values};
         """
