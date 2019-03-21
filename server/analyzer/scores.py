@@ -56,13 +56,13 @@ def subgraph_centrality_score(net):
     return subgraph_centrality(net)
 
 
-# TO-DO
+# TODO compute score
 # @score(SoECC)
 def soecc_score(net):
     pass
 
 
-# TO-DO
+# TODO compute score
 # @score('NC')
 def neighborhood_centrality_score(net):
     pass
@@ -75,8 +75,11 @@ def local_average_connectivity_centrality_score(net):
     lac = {}
     for vertex in net:
         number_neighbors = net.degree(vertex)
-        subgraph = net.subgraph(net.neighbors(vertex))
-        lac[vertex] = 2 * subgraph.size() / number_neighbors
+        if not number_neighbors:
+            lac[vertex] = 0
+        else:
+            subgraph = net.subgraph(net.neighbors(vertex))
+            lac[vertex] = 2 * subgraph.size() / number_neighbors
     return lac
 
 
@@ -85,7 +88,7 @@ def local_clustering_coefficient_score(net):
     return clustering(net)
 
 
-# TO-DO
+# TODO compute score
 # @score('ME')
 def me_score(net):
     pass
