@@ -80,12 +80,11 @@ async def process_alignment(job_id, data):
 
     try:
         async with connect_to_db(db_name.lower()) as db:
-            logger.info(f'[{job_id}] fetching data')
-
-            print(data)
+            logger.info(f'[{job_id}] fetching networks')
             net1 = await db_get_network(db, net1_desc)
             net2 = await db_get_network(db, net2_desc)
 
+            logger.info(f'[{job_id}] fetching bitscore matrices')
             net1_net2_scores = await db.get_bitscore_matrix(net1, net2)
 
             if aligner_name == 'alignet':
