@@ -1,8 +1,8 @@
 
 
-
 def map_column_alignment(df, alignment_series, column):
     return df.join(alignment_series.rename(column), on=column, how='left', lsuffix='_orig')
+
 
 def reverse_alignment_series(alignment_series):
     return alignment_series.reset_index().set_index(alignment_series.name).iloc[:, 0]
