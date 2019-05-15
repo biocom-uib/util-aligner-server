@@ -215,8 +215,6 @@ async def fetch_and_validate_previous_results(job_id, result_ids):
     for aligner, alignment in zip(aligners, alignments):
         alignment.rename(inplace=True, columns=lambda col: f'{col}_{aligner}')
 
-    # TODO start with Series(net1.vs['name'], name=alignments[0].index.name)
-
     joined = alignments[0].join(alignments[1:], how='outer').rename_axis(index=alignments[0].index.name).reset_index()
 
     return db_names[0], net1_descs[0], net2_descs[0], records, alignment_headers[0], joined
