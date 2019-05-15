@@ -61,8 +61,8 @@ def networks_summary(db_name, net1_desc, net1, net2_desc, net2):
     }
 
 
-def alignment_summary(net1, net2, alignment, ontology_mapping, files):
-    scores = compute_scores(net1, net2, alignment, ontology_mapping)
+def alignment_summary(net1, net2, alignment, bitscore_matrix, ontology_mapping, files):
+    scores = compute_scores(net1, net2, alignment, bitscore_matrix, ontology_mapping)
     files.update(split_score_data_as_tsvs(scores))
 
     return scores
@@ -131,14 +131,14 @@ async def process_alignment(job_id, data):
 
     if 'alignment' in results:
         alignment = results['alignment']
-        results['alignment'] = None
+        results['alignment'] = {'file': 'alignment_tsv'}
 
-        result_files['alignment_tsv'] = write_tsv_to_string(alignment)
+        result_files['alignment_tsv'] = write_tsv_to_string(alignment.reset_index())
 
         logger.info(f'[{job_id}] computing scores')
 
         try:
-            response_data['scores'] = alignment_summary(net1, net2, alignment, ontology_mapping, result_files)
+            response_data['scores'] = alignment_summary(net1, net2, alignment, net1_net2_scores, ontology_mapping, result_files)
         except:
             logger.exception(f'[{job_id}] exception was raised while computing scores')
 
@@ -183,6 +183,9 @@ async def fetch_and_validate_previous_results(job_id, result_ids):
     records = await gather(*[retrieve_alignment_result(result_id) for result_id in result_ids])
     records = [record for record in records if record['results']['ok'] and 'alignment_tsv' in record['files']]
 
+    if len(records) == 0:
+        raise ValueError(f'[{job_id}] no successful alignments to compare')
+
     db_names = [record['db'].lower() for record in records]
     if not all_equal(db_names):
         raise ValueError(f'[{job_id}] mismatching databases: ' + str(db_names))
@@ -212,7 +215,7 @@ async def fetch_and_validate_previous_results(job_id, result_ids):
     for aligner, alignment in zip(aligners, alignments):
         alignment.rename(inplace=True, columns=lambda col: f'{col}_{aligner}')
 
-    joined = alignments[0].join(alignments[1:], how='outer')
+    joined = alignments[0].join(alignments[1:], how='outer').rename_axis(index=alignments[0].index.name)
 
     return db_names[0], net1_descs[0], net2_descs[0], records, alignment_headers[0], joined
 
@@ -223,7 +226,7 @@ async def compare_alignments(job_id, data):
     results = {'ok': True, 'exception': None}
     result_files = dict()
 
-    result_ids = data['results_object_ids']
+    result_ids = data.get('results_object_ids', [])
 
     response_data = {'results': results, 'results_object_ids': result_ids}
 
@@ -236,6 +239,7 @@ async def compare_alignments(job_id, data):
         async with connect_to_db(db_name) as db:
             net1 = await db_get_network(db, net1_desc)
             net2 = await db_get_network(db, net2_desc)
+            bitscore_matrix = await db.get_bitscore_matrix(net1, net2)
             ontology_mapping = await db.get_ontology_mapping([net1, net2])
 
     except Exception as e:
@@ -244,17 +248,17 @@ async def compare_alignments(job_id, data):
 
     else:
         consensus = joined.loc[joined.agg(all_equal, axis=1)].iloc[:,:1]
-        consensus.rename_axis(alignment_header[0], inplace=True)
         consensus.columns = [alignment_header[1]]
+        consensus.rename_axis(index=alignment_header[0], inplace=True)
 
         results.update({
-            'joined': None,
-            'consensus': None
+            'joined': {'file': 'joined_tsv'},
+            'consensus': {'file': 'consensus_tsv'}
         })
 
         result_files.update({
-            'joined_tsv': write_tsv_to_string(joined),
-            'consensus_tsv': write_tsv_to_string(consensus)
+            'joined_tsv': write_tsv_to_string(joined.reset_index()),
+            'consensus_tsv': write_tsv_to_string(consensus.reset_index())
         })
 
         response_data.update(networks_summary(db_name, net1_desc, net1, net2_desc, net2))
@@ -262,7 +266,7 @@ async def compare_alignments(job_id, data):
         logger.info(f'[{job_id}] computing scores')
 
         try:
-            response_data['consensus_scores'] = alignment_summary(net1, net2, consensus, ontology_mapping, result_files)
+            response_data['consensus_scores'] = alignment_summary(net1, net2, consensus, bitscore_matrix, ontology_mapping, result_files)
         except:
             logger.exception(f'[{job_id}] exception was raised while computing scores')
 

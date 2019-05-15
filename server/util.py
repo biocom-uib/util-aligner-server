@@ -44,7 +44,10 @@ def write_csv(file_path, records, **kwargs):
 
 def write_tsv_to_string(table, header=[]):
     if isinstance(table, pd.DataFrame):
-        return table.to_csv(sep='\t', header = header or True)
+        return table.to_csv(sep='\t', index=False, header = header or True)
+
+    elif isinstance(table, pd.Series):
+        return table.to_csv(sep='\t', index=False, header = header or True)
 
     else:
         f = StringIO()
