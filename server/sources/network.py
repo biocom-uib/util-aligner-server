@@ -89,7 +89,7 @@ def read_tsv_edgelist(*, path=None, string=None, header=False):
 
 
 def read_net_tsv_edgelist(name, *, net_path=None, string=None, header=False):
-    edgelist = EdgeListNetwork(name, read_tsv_edgelist(path=net_path, string=string, header=header))
+    edgelist = read_tsv_edgelist(path=net_path, string=string, header=header)
 
     return EdgeListNetwork(name, edgelist) if edgelist is not None else None
 
