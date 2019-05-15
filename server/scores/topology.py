@@ -39,33 +39,27 @@ def compute_ec_image_scores(net1, net2, alignment):
 
     num_preserved_edges = int(preserved_edges.is_edge.sum())
 
-    non_preserved_edges = list(
-        preserved_edges.reset_index()
-            .loc[lambda df: ~df.is_edge, ['source_orig', 'target_orig']]
-            .astype(str)
-            .itertuples(index=False, name=None)
-    )
+    non_preserved_edges = preserved_edges.reset_index() \
+        .loc[lambda df: ~df.is_edge, ['source_orig', 'target_orig']] \
+        .astype(str)
 
-    unaligned_edges = list(
-        image.loc[image.source.isna() | image.target.isna(), ['source_orig', 'target_orig']]
-            .astype(str)
-            .itertuples(index=False, name=None)
-    )
+    unaligned_edges = image.loc[image.source.isna() | image.target.isna(), ['source_orig', 'target_orig']] \
+        .astype(str)
 
     min_es = net1.igraph.ecount() if net1.igraph.vcount() <= net2.igraph.vcount() else net2.igraph.ecount()
 
     return {
-        'invalid_images': invalid_images,
+        'invalid_images': pd.Series(invalid_images, name='invalid_images'),
         'num_invalid_images': len(invalid_images),
 
-        'unaligned_nodes': unaligned_nodes,
+        'unaligned_nodes': pd.Series(unaligned_nodes, name='unaligned_nodes'),
         'num_unaligned_nodes': len(unaligned_nodes),
 
         'unaligned_edges': unaligned_edges,
         'num_unaligned_edges': len(unaligned_edges),
 
-        'num_preserved_edges': num_preserved_edges,
         'non_preserved_edges': non_preserved_edges,
+        'num_preserved_edges': num_preserved_edges,
 
         'min_n_edges': min_es,
         'ec_score': num_preserved_edges/min_es if min_es > 0 else -1.0,
@@ -89,16 +83,13 @@ def compute_ec_preimage_scores(net1, net2, alignment):
 
     num_reflected_edges = int(reflected_edges.is_edge.sum())
 
-    non_reflected_edges = list(
-        reflected_edges.reset_index() \
-            .loc[lambda df: ~df.is_edge, ['source_orig', 'target_orig']] \
-            .astype(str)
-            .itertuples(name=None)
-    )
+    non_reflected_edges = reflected_edges.reset_index() \
+        .loc[lambda df: ~df.is_edge, ['source_orig', 'target_orig']] \
+        .astype(str)
 
     return {
+        'non_reflected_edges': non_reflected_edges,
         'num_reflected_edges': num_reflected_edges,
-        'non_reflected_edges': non_reflected_edges
     }
 
 

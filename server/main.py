@@ -131,9 +131,9 @@ async def process_alignment(job_id, data):
 
     if 'alignment' in results:
         alignment = results['alignment']
-        results['alignment'] = None
+        results['alignment'] = {'file': 'alignment_tsv'}
 
-        result_files['alignment_tsv'] = write_tsv_to_string(alignment)
+        result_files['alignment_tsv'] = write_tsv_to_string(alignment.reset_index())
 
         logger.info(f'[{job_id}] computing scores')
 
@@ -183,6 +183,9 @@ async def fetch_and_validate_previous_results(job_id, result_ids):
     records = await gather(*[retrieve_alignment_result(result_id) for result_id in result_ids])
     records = [record for record in records if record['results']['ok'] and 'alignment_tsv' in record['files']]
 
+    if len(records) == 0:
+        raise ValueError(f'[{job_id}] no successful alignments to compare')
+
     db_names = [record['db'].lower() for record in records]
     if not all_equal(db_names):
         raise ValueError(f'[{job_id}] mismatching databases: ' + str(db_names))
@@ -212,7 +215,9 @@ async def fetch_and_validate_previous_results(job_id, result_ids):
     for aligner, alignment in zip(aligners, alignments):
         alignment.rename(inplace=True, columns=lambda col: f'{col}_{aligner}')
 
-    joined = alignments[0].join(alignments[1:], how='outer')
+    # TODO start with Series(net1.vs['name'], name=alignments[0].index.name)
+
+    joined = alignments[0].join(alignments[1:], how='outer').rename_axis(index=alignments[0].index.name).reset_index()
 
     return db_names[0], net1_descs[0], net2_descs[0], records, alignment_headers[0], joined
 
@@ -223,7 +228,7 @@ async def compare_alignments(job_id, data):
     results = {'ok': True, 'exception': None}
     result_files = dict()
 
-    result_ids = data['results_object_ids']
+    result_ids = data.get('results_object_ids', [])
 
     response_data = {'results': results, 'results_object_ids': result_ids}
 
@@ -245,12 +250,12 @@ async def compare_alignments(job_id, data):
 
     else:
         consensus = joined.loc[joined.agg(all_equal, axis=1)].iloc[:,:1]
-        consensus.rename_axis(alignment_header[0], inplace=True)
         consensus.columns = [alignment_header[1]]
+        consensus.rename_axis(index=alignment_header[0], inplace=True)
 
         results.update({
-            'joined': None,
-            'consensus': None
+            'joined': {'file': 'joined_tsv'},
+            'consensus': {'file': 'consensus_tsv'}
         })
 
         result_files.update({

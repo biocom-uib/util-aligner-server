@@ -21,7 +21,8 @@ async def insert_split(collection, job_id, document, files=dict()):
     file_ids = dict()
 
     for filename, content in files.items():
-        file_ids[filename] = await gridfs.upload_from_stream(f'{job_id}/{filename}', content.encode('utf-8'))
+        file_id = await gridfs.upload_from_stream(f'{job_id}/{filename}', content.encode('utf-8'))
+        file_ids[filename] = str(file_id)
 
     document['files'] = file_ids
 

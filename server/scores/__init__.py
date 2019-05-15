@@ -34,7 +34,7 @@ def split_score_data_as_tsvs(scores):
             tsv_key = '/'.join(path) + '_tsv'
 
             tsvs[tsv_key] = write_tsv_to_string(parent_dict[path[-1]])
-            parent_dict[path[-1]] = None
+            parent_dict[path[-1]] = {'file': tsv_key}
 
     key_to_file('ec_data', 'invalid_images')
     key_to_file('ec_data', 'unaligned_nodes')

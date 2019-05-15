@@ -1,5 +1,6 @@
 from collections import Counter
 from math import isnan
+import pandas as pd
 
 from go_tools import init_default_hrss
 from semantic_similarity import JaccardSim
@@ -28,7 +29,7 @@ def compute_fc(alignment, ontology_mapping, dissim):
 
     results = []
 
-    for p1_name, p2_name in alignment.itertuples(name=None):
+    for p1_name, p2_name in alignment.itertuples(name=True):
         gos1 = frozenset(ontology_mapping.get(p1_name, []))
         gos2 = frozenset(ontology_mapping.get(p2_name, []))
 
@@ -40,7 +41,8 @@ def compute_fc(alignment, ontology_mapping, dissim):
             fc_len += 1
 
     fc_avg = fc_sum/fc_len if fc_len > 0 else -1
-    return results, fc_avg
+    results_df = pd.DataFrame(results, columns=[alignment.index.name, alignment.columns[0], 'fc'])
+    return results_df, fc_avg
 
 
 def compute_bitscore_fc(alignment, bitscore_matrix):
@@ -75,8 +77,8 @@ def compute_fc_scores(net1, net2, alignment, bitscore_matrix, ontology_mapping):
             'fc_values_jaccard': fc_values_jaccard,
             'fc_score_hrss_bma': fc_hrss_bma,
             'fc_values_hrss_bma': fc_values_hrss_bma,
-            'unannotated_prots_net1': list(no_go_prots_net1),
-            'unannotated_prots_net2': list(no_go_prots_net2),
+            'unannotated_prots_net1': pd.Series(list(no_go_prots_net1), name='unannotated_prots_net1'),
+            'unannotated_prots_net2': pd.Series(list(no_go_prots_net2), name='unannotated_prots_net2'),
             'ann_freqs_net1': {str(ann_cnt): freq for ann_cnt, freq in ann_freqs_net1.items()},
             'ann_freqs_net2': {str(ann_cnt): freq for ann_cnt, freq in ann_freqs_net2.items()}
         })
