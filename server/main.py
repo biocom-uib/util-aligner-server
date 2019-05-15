@@ -215,7 +215,7 @@ async def fetch_and_validate_previous_results(job_id, result_ids):
     for aligner, alignment in zip(aligners, alignments):
         alignment.rename(inplace=True, columns=lambda col: f'{col}_{aligner}')
 
-    joined = alignments[0].join(alignments[1:], how='outer').rename_axis(index=alignments[0].index.name).reset_index()
+    joined = alignments[0].join(alignments[1:], how='outer').rename_axis(index=alignments[0].index.name)
 
     return db_names[0], net1_descs[0], net2_descs[0], records, alignment_headers[0], joined
 
@@ -257,8 +257,8 @@ async def compare_alignments(job_id, data):
         })
 
         result_files.update({
-            'joined_tsv': write_tsv_to_string(joined),
-            'consensus_tsv': write_tsv_to_string(consensus)
+            'joined_tsv': write_tsv_to_string(joined.reset_index()),
+            'consensus_tsv': write_tsv_to_string(consensus.reset_index())
         })
 
         response_data.update(networks_summary(db_name, net1_desc, net1, net2_desc, net2))
