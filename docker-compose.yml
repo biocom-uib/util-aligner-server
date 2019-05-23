@@ -4,7 +4,7 @@ services:
     server-aligner:
       build:
         context: .
-        dockerfile: ./docker/Dockerfile
+        dockerfile: ./docker/Dockerfile_base
       depends_on:
         - rabbitmq
         - mysql
@@ -38,7 +38,7 @@ services:
     server-comparer:
       build:
         context: .
-        dockerfile: ./docker/Dockerfile
+        dockerfile: ./docker/Dockerfile_base
       depends_on:
         - rabbitmq
         - mysql
