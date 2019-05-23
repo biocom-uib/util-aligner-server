@@ -11,3 +11,4 @@ ujson==1.35
 networkx==2.3
 pronto==0.12.2
 pandas==0.24.2
+msgpack==0.6.1

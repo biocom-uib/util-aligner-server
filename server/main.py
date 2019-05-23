@@ -14,7 +14,7 @@ from mongo import retrieve_file, retrieve_alignment_result, insert_alignment, in
 from server_queue import app
 from scores import compute_scores, split_score_data_as_tsvs
 from sources.isobase.local import isobase_local_source
-from sources.stringdb.postgres import stringdb_postgres_source
+from sources.stringdb.api import stringdb_api_source
 from sources.stringdbvirus.local import stringdbvirus_local_source
 from util import all_equal, write_tsv_to_string
 from aligners import load_aligner_classes
@@ -29,7 +29,7 @@ def connect_to_db(db_name):
     if db_name == 'isobase':
         return isobase_local_source('/opt/local-db/isobase')
     elif db_name == 'stringdb':
-        return stringdb_postgres_source()
+        return stringdb_api_source('http://sources-api:8080/')
     elif db_name == 'stringdbvirus':
         return stringdbvirus_local_source('/opt/local-db/stringdb-virus-gv')
     else:
