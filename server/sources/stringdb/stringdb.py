@@ -234,10 +234,8 @@ class StringDB(object):
 
             values = await cursor.fetchall()
 
-        array_dtype = [('protein_id_a', 'i4'), ('protein_id_b', 'i4'), ('bitscore', 'f4')]
-
         if values:
-            return pd.DataFrame(values)
+            return pd.DataFrame(values, columns=['protein_id_a', 'protein_id_b', 'bitscore'])
         else:
             raise LookupError('bitscore matrix not available for the selected network pair')
 
