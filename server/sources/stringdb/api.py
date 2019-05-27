@@ -77,7 +77,7 @@ class StringDBAPISource(Source):
     async def get_ontology_mapping(self, networks):
         species_ids = {species_id for network in networks for species_id in network.species_ids}
 
-        return await self.client.request_msgpack('POST', '/db/stringdb/go/select', json={
+        return await self.client.request_msgpack('POST', '/db/stringdb/go/annotations/select', json={
             'species_ids': list(species_ids)
         })
 
