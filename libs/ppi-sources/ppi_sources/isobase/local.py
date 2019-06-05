@@ -1,4 +1,3 @@
-from contextlib import asynccontextmanager
 from os import path
 import json
 
@@ -58,6 +57,12 @@ class IsobaseLocalSource(Source):
             return json.load(go_f)
 
 
-@asynccontextmanager
-async def isobase_local_source(base_path):
-    yield IsobaseLocalSource(base_path)
+try:
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def isobase_local_source(base_path):
+        yield IsobaseLocalSource(base_path)
+
+except ImportError:
+    pass

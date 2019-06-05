@@ -1,4 +1,3 @@
-from contextlib import asynccontextmanager
 from hashlib import sha1
 import json
 import pandas as pd
@@ -43,8 +42,13 @@ class StringDBPostgresSource(Source):
         return await self.db.get_ontology_mapping(tuple(species_ids))
 
 
+try:
+    from contextlib import asynccontextmanager
 
-@asynccontextmanager
-async def stringdb_postgres_source(**kwargs):
-    async with StringDB(**kwargs) as db:
-        yield StringDBPostgresSource(db)
+    @asynccontextmanager
+    async def stringdb_postgres_source(**kwargs):
+        async with StringDB(**kwargs) as db:
+            yield StringDBPostgresSource(db)
+
+except ImportError:
+    pass

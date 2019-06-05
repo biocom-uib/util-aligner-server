@@ -1,5 +1,4 @@
 from aiohttp import ClientSession, TCPConnector
-from contextlib import asynccontextmanager
 import numpy as np
 import pandas as pd
 
@@ -95,10 +94,16 @@ class StringDBAPISource(Source):
         })
 
 
-@asynccontextmanager
-async def stringdb_api_source(host=None, *, timeout=SourceAPIClient.DEFAULT_TIMEOUT, http_client=None):
-    if http_client is None:
-        async with ClientSession(timeout=timeout) as session:
+try:
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def stringdb_api_source(host=None, *, timeout=SourceAPIClient.DEFAULT_TIMEOUT, http_client=None):
+        if http_client is None:
+            async with ClientSession(timeout=timeout) as session:
+                yield StringDBAPISource(session, host=host)
+        else:
             yield StringDBAPISource(session, host=host)
-    else:
-        yield StringDBAPISource(session, host=host)
+
+except ImportError:
+    pass
