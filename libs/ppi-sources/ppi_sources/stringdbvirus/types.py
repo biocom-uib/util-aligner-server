@@ -1,9 +1,9 @@
-from server.sources.network import EdgeListNetwork, VirusHostNetwork
+from ppi_sources.network import EdgeListNetwork, VirusHostNetwork
 
 
 class StringDBVirusNetwork(EdgeListNetwork, VirusHostNetwork):
-    def __init__(self, host_id, virus_id, edgelist):
-        EdgeListNetwork.__init__(self, f'{host_id}-{virus_id}', edgelist)
+    def __init__(self, host_id, virus_id, edges_df):
+        EdgeListNetwork.__init__(self, f'{host_id}-{virus_id}', edges_df)
         VirusHostNetwork.__init__(self, host_name=str(host_id), virus_name=str(virus_id))
 
         self.host_id = host_id

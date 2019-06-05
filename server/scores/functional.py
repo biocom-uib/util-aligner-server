@@ -49,9 +49,12 @@ def compute_bitscore_fc(alignment, bitscore_matrix):
     bitscore_df = bitscore_matrix.to_dataframe()
 
     alignment_df = alignment.reset_index()
-    alignment_df.columns = bitscore_df.index.names
 
-    relevant_bitscores = bitscore_df.join(alignment_df.set_index(bitscore_df.index.names), how='inner')
+    col_names = list(bitscore_df.columns[:2])
+    alignment_df.columns = col_names
+    bitscore_df = bitscore_df.set_index(col_names)
+
+    relevant_bitscores = bitscore_df.join(alignment_df.set_index(col_names), how='inner')
 
     return float(relevant_bitscores.bitscore.sum() / bitscore_df.bitscore.max()) \
         if not relevant_bitscores.empty else -1

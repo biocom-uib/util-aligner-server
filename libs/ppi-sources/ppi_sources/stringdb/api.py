@@ -3,9 +3,9 @@ from contextlib import asynccontextmanager
 import numpy as np
 import pandas as pd
 
-from server.sources.api import SourceAPIClient
-from server.sources.source import Source
-from server.sources.stringdb.types import StringDBNetwork, StringDBBitscoreMatrix
+from ppi_sources.api import SourceAPIClient
+from ppi_sources.source import Source
+from ppi_sources.stringdb.types import StringDBNetwork, StringDBBitscoreMatrix
 
 
 
@@ -26,11 +26,17 @@ class StringDBAPISource(Source):
                 'species_id': [net_desc['species_id']]
             }
         })
-        ext_ids = ext_ids.rename(columns={'protein_id': 'string_id', 'protein_external_id': 'external_id'})
+        ext_ids = ext_ids.rename(columns={
+            'protein_id': 'string_id',
+            'protein_external_id': 'external_id'
+        })
 
         edges_df = await self.client.request_dataframe('POST', '/db/stringdb/network/edges/select', json=net_desc)
 
-        return StringDBNetwork(name, [net_desc['species_id']], ext_ids.set_index('string_id').external_id, edges_df)
+        return StringDBNetwork(name,
+                [net_desc['species_id']],
+                ext_ids.set_index('string_id').external_id,
+                edges_df)
 
 
     async def build_custom_network(self, net_desc):
@@ -41,10 +47,13 @@ class StringDBAPISource(Source):
         vert_data = await self.client.request_dataframe('POST', '/db/stringdb/items/proteins/select', json={
             'columns': ['protein_id', 'species_id', 'protein_external_id'],
             'filter': {
-                'protein_external_id': list(vert_ids)
+                'protein_external_id': vert_ids
             }
         })
-        vert_data = vert_data.rename(columns={'protein_id': 'string_id', 'protein_external_id': 'external_id'})
+        vert_data = vert_data.rename(columns={
+            'protein_id': 'string_id',
+            'protein_external_id': 'external_id'
+        })
 
         species_ids = vertices.species_id.unique().tolist()
 
@@ -69,7 +78,11 @@ class StringDBAPISource(Source):
             'net2_species_ids': list(net2.species_ids),
             'net2_protein_ids': list(net2.string_ids)
         })
-        df = df.rename(columns={'protein_id_a': 'protein_id_a', 'protein_id_b': 'protein_id_b', 'bitscore': 'bitscore'})
+        df = df.rename(columns={
+            'protein_id_a': 'protein_id_a',
+            'protein_id_b': 'protein_id_b',
+            'bitscore': 'bitscore'
+        })
 
         return StringDBBitscoreMatrix(df, net1, net2, by='string_id')
 

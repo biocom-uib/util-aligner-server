@@ -13,9 +13,9 @@ from config import config
 from mongo import retrieve_file, retrieve_alignment_result, insert_alignment, insert_comparison
 from server_queue import app
 from scores import compute_scores, split_score_data_as_tsvs
-from sources.isobase.local import isobase_local_source
-from sources.stringdb.api import stringdb_api_source
-from sources.stringdbvirus.local import stringdbvirus_local_source
+from ppi_sources.isobase.local import isobase_local_source
+from ppi_sources.stringdb.api import stringdb_api_source
+from ppi_sources.stringdbvirus.local import stringdbvirus_local_source
 from util import all_equal, write_tsv_to_string
 from aligners import load_aligner_classes
 

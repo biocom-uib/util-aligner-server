@@ -3,9 +3,9 @@ from hashlib import sha1
 import json
 import pandas as pd
 
-from server.sources.source import Source
-from server.sources.stringdb.stringdb import StringDB
-from server.sources.stringdb.types import StringDBNetwork, StringDBBitscoreMatrix
+from ppi_sources.source import Source
+from ppi_sources.stringdb.stringdb import StringDB
+from ppi_sources.stringdb.types import StringDBNetwork, StringDBBitscoreMatrix
 
 
 class StringDBPostgresSource(Source):

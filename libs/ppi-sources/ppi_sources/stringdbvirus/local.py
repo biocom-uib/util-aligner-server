@@ -1,9 +1,10 @@
-from contextlib import asynccontextmanager
 from os import path
+import pandas as pd
 
-from server.sources.network import read_tsv_edgelist
-from server.sources.bitscore import read_tricol_bitscores
-from server.sources.source import Source
+from ppi_sources.bitscore import read_tricol_bitscores
+from ppi_sources.source import Source
+
+from ppi_sources.stringdbvirus.types import StringDBVirusNetwork
 
 
 class StringDBVirusLocalSource(Source):
@@ -18,8 +19,8 @@ class StringDBVirusLocalSource(Source):
     #     if not path.isfile(species_path):
     #         raise LookupError(f'network file for {network_name} was not found')
 
-    #     edgelist = read_tsv_edgelist(path=species_path, header=True)
-    #     return StringDBVirusNetwork(host_id, virus_id, edgelist) if edgelist is not None else None
+    #     edges_df = read_edgelist_tsv(path=species_path, header=True)
+    #     return StringDBVirusNetwork(host_id, virus_id, edges_df) if edges_df is not None else None
 
 
     async def get_network(self, net_desc):
@@ -32,12 +33,14 @@ class StringDBVirusLocalSource(Source):
         if not path.isfile(species_path):
             raise LookupError(f'network file for {network_name} was not found')
 
-        edgelist = read_tsv_edgelist(path=species_path, header=False)
+        edges_df = pd.read_csv(
+            path=species_path,
+            sep='\t',
+            header=None,
+            names=['source', 'target', 'score'],
+            usecols=[0,1])
 
-        if edgelist is None:
-            return None
-        else:
-            return StringDBVirusNetwork(host_id, virus_id, [row[:2] for row in edgelist])
+        return StringDBVirusNetwork(host_id, virus_id, edges_df) if edges_df is not None else None
 
 
     async def build_custom_network(self, net_desc):
@@ -69,7 +72,12 @@ class StringDBVirusLocalSource(Source):
         return {}
 
 
+try:
+    from contextlib import asynccontextmanager
 
-@asynccontextmanager
-async def stringdbvirus_local_source(base_path):
-    yield StringDBVirusLocalSource(base_path)
+    @asynccontextmanager
+    async def stringdbvirus_local_source(base_path):
+        yield StringDBVirusLocalSource(base_path)
+
+except ImportError:
+    pass

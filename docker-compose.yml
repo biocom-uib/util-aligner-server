@@ -3,8 +3,8 @@ version: '3'
 services:
     server-aligner:
       build:
-        context: .
-        dockerfile: ./docker/Dockerfile_base
+        context: ./docker
+        dockerfile: ./Dockerfile_base
       depends_on:
         - rabbitmq
         - mysql
@@ -37,8 +37,8 @@ services:
 
     server-comparer:
       build:
-        context: .
-        dockerfile: ./docker/Dockerfile_base
+        context: ./docker
+        dockerfile: ./Dockerfile_base
       depends_on:
         - rabbitmq
         - mysql

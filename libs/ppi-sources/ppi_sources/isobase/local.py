@@ -2,9 +2,9 @@ from contextlib import asynccontextmanager
 from os import path
 import json
 
-from server.sources.bitscore import read_tricol_bitscores
-from server.sources.network import read_net_tsv_edgelist
-from server.sources.source import Source
+from ppi_sources.bitscore import read_tricol_bitscores
+from ppi_sources.network import read_net_edgelist_tsv
+from ppi_sources.source import Source
 
 
 class IsobaseLocalSource(Source):
@@ -26,7 +26,7 @@ class IsobaseLocalSource(Source):
         if not path.isfile(species_path):
             raise LookupError(f'network file for {species_name} was not found')
 
-        return read_net_tsv_edgelist(species_name, net_path=species_path)
+        return read_net_edgelist_tsv(species_name, net_path=species_path)
 
 
     async def build_custom_network(self, net_desc):

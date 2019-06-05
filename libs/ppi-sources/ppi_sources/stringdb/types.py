@@ -1,18 +1,18 @@
 import igraph
 
-from server.sources.network import Network
-from server.sources.bitscore import TricolBitscoreMatrix
+from ppi_sources.network import Network
+from ppi_sources.bitscore import TricolBitscoreMatrix
 
 
 class StringDBNetwork(Network):
-    def __init__(self, name, species_ids, external_ids, edges):
+    def __init__(self, name, species_ids, external_ids, string_id_edges_df):
         super().__init__(name)
-        self.species_ids = species_ids
 
+        self._string_id_edges = string_id_edges_df.astype(str)
+
+        self.species_ids = species_ids
         self.external_ids = external_ids.rename('external_id').rename_axis(index='string_id')
 
-        self.edges = edges.copy(deep=False)
-        self.edges.columns = ['node_id_a', 'node_id_b']
 
     def to_igraph(self):
         # NOTE: igraph has some bugs regarding non-str names
@@ -20,7 +20,7 @@ class StringDBNetwork(Network):
 
         ext_ids = self.external_ids
 
-        graph = igraph.Graph.TupleList(self.edges.to_numpy())
+        graph = igraph.Graph.TupleList(self._string_id_edges.to_numpy(copy=False))
 
         for v in graph.vs:
             string_id = int(v['name']) # better have unique names
@@ -35,6 +35,7 @@ class StringDBNetwork(Network):
 
         return graph
 
+
     @property
     def string_ids(self):
         return {int(v) for v in self.iter_vertices(by='string_id')}
@@ -43,6 +44,7 @@ class StringDBNetwork(Network):
 class StringDBBitscoreMatrix(TricolBitscoreMatrix):
     def __init__(self, tricol, net1, net2, by='string_id'):
         super().__init__(tricol, net1, net2, by)
+
 
     def iter_tricol(self, by='name'):
         # just an optimization

@@ -1,0 +1,8 @@
+aiohttp==3.5.4
+aiopg==0.16.0
+aiomysql==0.0.20
+python-igraph==0.7.1.post6
+numpy==1.16.2
+networkx==2.3
+pandas==0.24.2
+msgpack==0.6.1
