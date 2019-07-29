@@ -1,0 +1,34 @@
+version: '3'
+
+services:
+  server-aligner:
+    env_file:
+      - prod.env
+    networks:
+      - sources-net
+
+
+  server-comparer:
+    env_file:
+      - prod.env
+    networks:
+      - sources-net
+
+  mysql:
+    ports:
+      - 3306:3306
+
+  rabbitmq:
+    env_file:
+      - prod.env
+    ports:
+      - 15672:15672
+      - 5672:5672
+
+  mongo:
+    ports:
+      - 27017:27017
+
+networks:
+  sources-net:
+    external: true
