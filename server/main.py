@@ -29,7 +29,7 @@ def connect_to_db(db_name):
     if db_name == 'isobase':
         return isobase_local_source('/opt/local-db/isobase')
     elif db_name == 'stringdb':
-        return stringdb_api_source('http://sources-api:8080/')
+        return stringdb_api_source(config['SOURCES_API_URL'])
     elif db_name == 'stringdbvirus':
         return stringdbvirus_local_source('/opt/local-db/stringdb-virus-gv')
     else:
