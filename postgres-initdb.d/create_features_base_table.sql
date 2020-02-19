@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS features.base_table (
+    external_id                     TEXT NOT NULL,
+    specie_id                       INTEGER NOT NULL,
+    equiv_nscore                    INTEGER,
+    equiv_nscore_transferred        INTEGER,
+    equiv_fscore                    INTEGER,
+    equiv_pscore                    INTEGER,
+    equiv_hscore                    INTEGER,
+    array_score                     INTEGER,
+    array_score_transferred         INTEGER,
+    experimental_score              INTEGER,
+    experimental_score_transferred  INTEGER,
+    database_score                  INTEGER,
+    database_score_transferred      INTEGER,
+    textmining_score                INTEGER,
+    textmining_score_transferred    INTEGER,
+    neighborhood_score              INTEGER,
+    fusion_score                    INTEGER,
+    cooccurence_score               INTEGER,
+    value                           NUMBER NOT NULL
+    );
