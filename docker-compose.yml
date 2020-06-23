@@ -7,7 +7,6 @@ services:
       dockerfile: ./Dockerfile_base
     depends_on:
       - rabbitmq
-      - mysql
       - mongo
     command:
       - celery
@@ -35,7 +34,6 @@ services:
       dockerfile: ./Dockerfile_base
     depends_on:
       - rabbitmq
-      - mysql
       - mongo
     command:
       - celery
@@ -54,25 +52,6 @@ services:
       server-net:
         ipv4_address: 172.20.0.3
         aliases: [server-comparer]
-
-  mysql:
-    image: mysql:5.7.17
-    command:
-      - --character-set-server=utf8
-      - --collation-server=utf8_unicode_ci
-      - --skip-character-set-client-handshake
-      - --bind-address=0.0.0.0
-    volumes:
-      - mysql-data:/var/lib/mysql
-      - ./dumps:/opt/dumps
-      - ./mysql-initdb.d:/docker-entrypoint-initdb.d:ro
-    environment:
-      - MYSQL_ROOT_PASSWORD=root
-      - MYSQL_DATABASE=protein_db
-    networks:
-      server-net:
-        ipv4_address: 172.20.0.4
-        aliases: [mysql]
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
@@ -99,7 +78,6 @@ services:
         aliases: [mongo]
 
 volumes:
-  mysql-data:
   mongo-data:
 
 networks:

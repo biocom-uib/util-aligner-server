@@ -14,10 +14,6 @@ services:
     networks:
       - sources-net
 
-  mysql:
-    ports:
-      - 3306:3306
-
   rabbitmq:
     env_file:
       - prod.env
