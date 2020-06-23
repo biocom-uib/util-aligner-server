@@ -29,7 +29,7 @@ def compute_fc(alignment, ontology_mapping, dissim):
 
     results = []
 
-    for p1_name, p2_name in alignment.itertuples(name=True):
+    for p1_name, p2_name in alignment.itertuples(names=None, index=True):
         gos1 = frozenset(ontology_mapping.get(p1_name, []))
         gos2 = frozenset(ontology_mapping.get(p2_name, []))
 
