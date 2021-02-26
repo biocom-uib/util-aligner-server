@@ -1,5 +1,5 @@
 celery==4.1.1
-aiohttp==3.0.6
+aiohttp==3.7.4
 aiopg==0.13.2
 aiomysql==0.0.9
 environs==2.1.0
