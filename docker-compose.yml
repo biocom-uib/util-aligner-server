@@ -2,9 +2,10 @@ version: '3'
 
 services:
   server-aligner:
+    image: bielr/util-aligner-server:0.2
     build:
       context: ./docker
-      dockerfile: ./Dockerfile_base
+      dockerfile: ./Dockerfile
     depends_on:
       - rabbitmq
       - mongo
@@ -29,9 +30,10 @@ services:
         aliases: [server-aligner]
 
   server-comparer:
-    build:
-      context: ./docker
-      dockerfile: ./Dockerfile_base
+    image: bielr/util-aligner-server:0.2
+    # build:
+    #   context: ./docker
+    #   dockerfile: ./Dockerfile
     depends_on:
       - rabbitmq
       - mongo

@@ -29,7 +29,7 @@ def compute_fc(alignment, ontology_mapping, dissim):
 
     results = []
 
-    for p1_name, p2_name in alignment.itertuples(names=None, index=True):
+    for p1_name, p2_name in alignment.itertuples(name=None, index=True):
         gos1 = frozenset(ontology_mapping.get(p1_name, []))
         gos2 = frozenset(ontology_mapping.get(p2_name, []))
 
@@ -60,7 +60,7 @@ def compute_bitscore_fc(alignment, bitscore_matrix):
         if not relevant_bitscores.empty else -1
 
 
-jaccard_dissim = JaccardSim().compare
+jaccard_sim = JaccardSim().compare
 hrss_bma_sim = init_default_hrss().compare
 
 def compute_fc_scores(net1, net2, alignment, bitscore_matrix, ontology_mapping):
@@ -69,7 +69,7 @@ def compute_fc_scores(net1, net2, alignment, bitscore_matrix, ontology_mapping):
     fc_data = {'fc_score_bitscore': bitscore_fc}
 
     if ontology_mapping:
-        fc_values_jaccard,  fc_jaccard  = compute_fc(alignment, ontology_mapping, jaccard_dissim)
+        fc_values_jaccard,  fc_jaccard  = compute_fc(alignment, ontology_mapping, jaccard_sim)
         fc_values_hrss_bma, fc_hrss_bma = compute_fc(alignment, ontology_mapping, hrss_bma_sim)
 
         ann_freqs_net1, no_go_prots_net1 = count_annotations(net1, ontology_mapping)
