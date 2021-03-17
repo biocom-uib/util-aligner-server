@@ -143,7 +143,11 @@ async def process_alignment_and_send(data):
     job_id = data['job_id']
 
     try:
-        logger.info(f'[{job_id}] processing alignment {data}')
+        str_data = str(data)
+        if len(str_data) > 1000:
+            logger.info(f'[{job_id}] processing alignment {str_data[:500]} ... {str_data[-500:]}')
+        else:
+            logger.info(f'[{job_id}] processing alignment {str_data}')
 
         response_data, result_files = await process_alignment(job_id, data)
 
