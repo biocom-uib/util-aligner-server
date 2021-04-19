@@ -3,6 +3,7 @@ version: '3'
 services:
   server-aligner:
     image: bielr/util-aligner-server:0.2
+    restart: unless-stopped
     build:
       context: ./docker
       dockerfile: ./Dockerfile
@@ -31,6 +32,7 @@ services:
 
   server-comparer:
     image: bielr/util-aligner-server:0.2
+    restart: unless-stopped
     # build:
     #   context: ./docker
     #   dockerfile: ./Dockerfile
@@ -57,6 +59,7 @@ services:
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
+    restart: unless-stopped
     networks:
       server-net:
         ipv4_address: 172.20.0.5
@@ -64,6 +67,7 @@ services:
 
   mongo:
     image: mongo:latest
+    restart: unless-stopped
     command:
       - mongod
       - --storageEngine=mmapv1
