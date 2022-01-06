@@ -1,4 +1,4 @@
-celery==4.1.1
+celery==5.2.2
 aiohttp==3.0.6
 aiopg==0.13.2
 aiomysql==0.0.9
