@@ -70,7 +70,7 @@ services:
     restart: unless-stopped
     command:
       - mongod
-      - --storageEngine=mmapv1
+      - --storageEngine=wiredTiger
       - --auth
       - --bind_ip_all
     security_opt:

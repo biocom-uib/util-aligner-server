@@ -68,22 +68,24 @@ def compute_fc_scores(net1, net2, alignment, bitscore_matrix, ontology_mapping):
 
     fc_data = {'fc_score_bitscore': bitscore_fc}
 
-    if ontology_mapping:
-        fc_values_jaccard,  fc_jaccard  = compute_fc(alignment, ontology_mapping, jaccard_sim)
-        fc_values_hrss_bma, fc_hrss_bma = compute_fc(alignment, ontology_mapping, hrss_bma_sim)
+    if ontology_mapping is None:
+        ontology_mapping = dict()
 
-        ann_freqs_net1, no_go_prots_net1 = count_annotations(net1, ontology_mapping)
-        ann_freqs_net2, no_go_prots_net2 = count_annotations(net2, ontology_mapping)
+    fc_values_jaccard,  fc_jaccard  = compute_fc(alignment, ontology_mapping, jaccard_sim)
+    fc_values_hrss_bma, fc_hrss_bma = compute_fc(alignment, ontology_mapping, hrss_bma_sim)
 
-        fc_data.update({
-            'fc_score_jaccard': fc_jaccard,
-            'fc_values_jaccard': fc_values_jaccard,
-            'fc_score_hrss_bma': fc_hrss_bma,
-            'fc_values_hrss_bma': fc_values_hrss_bma,
-            'unannotated_prots_net1': pd.Series(list(no_go_prots_net1), name='unannotated_prots_net1'),
-            'unannotated_prots_net2': pd.Series(list(no_go_prots_net2), name='unannotated_prots_net2'),
-            'ann_freqs_net1': {str(ann_cnt): freq for ann_cnt, freq in ann_freqs_net1.items()},
-            'ann_freqs_net2': {str(ann_cnt): freq for ann_cnt, freq in ann_freqs_net2.items()}
-        })
+    ann_freqs_net1, no_go_prots_net1 = count_annotations(net1, ontology_mapping)
+    ann_freqs_net2, no_go_prots_net2 = count_annotations(net2, ontology_mapping)
+
+    fc_data.update({
+        'fc_score_jaccard': fc_jaccard,
+        'fc_values_jaccard': fc_values_jaccard,
+        'fc_score_hrss_bma': fc_hrss_bma,
+        'fc_values_hrss_bma': fc_values_hrss_bma,
+        'unannotated_prots_net1': pd.Series(list(no_go_prots_net1), name='unannotated_prots_net1'),
+        'unannotated_prots_net2': pd.Series(list(no_go_prots_net2), name='unannotated_prots_net2'),
+        'ann_freqs_net1': {str(ann_cnt): freq for ann_cnt, freq in ann_freqs_net1.items()},
+        'ann_freqs_net2': {str(ann_cnt): freq for ann_cnt, freq in ann_freqs_net2.items()}
+    })
 
     return fc_data
