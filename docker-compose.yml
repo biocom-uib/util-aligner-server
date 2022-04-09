@@ -73,6 +73,8 @@ services:
       - --storageEngine=wiredTiger
       - --auth
       - --bind_ip_all
+      - --logpath
+      - /var/log/mongodb/mongod.log
     security_opt:
       - seccomp:seccomp_numa.json
     volumes:
